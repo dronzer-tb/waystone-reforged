@@ -36,8 +36,8 @@ class WarpItemListener(
         if (itemInHand.type == Material.COMPASS &&
                 (event.action == Action.RIGHT_CLICK_AIR || event.action == Action.RIGHT_CLICK_BLOCK)) {
             if (geyserMenuIntegration?.isBedrockPlayer(player) == true) {
-                val plugin = org.bukkit.plugin.java.JavaPlugin.getPlugin(dev.mizarc.waystonewarps.WaystoneWarps::class.java)
-                BedrockWarpMenu(player, plugin).open()
+                val api = geyserMenuIntegration.getApi() ?: return
+                BedrockWarpMenu(player, api).open()
             } else {
                 val menuNavigator = MenuNavigator(player)
                 val menu = WarpMenu(event.player, menuNavigator, localizationProvider)
