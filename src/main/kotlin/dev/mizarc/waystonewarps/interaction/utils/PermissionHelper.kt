@@ -39,13 +39,6 @@ object PermissionHelper {
     }
 
     /**
-     * Checks if a player can change the icon of a waystone
-     */
-    fun canChangeIcon(player: Player, waystoneOwnerId: UUID): Boolean {
-        return canModifyWaystone(player, waystoneOwnerId, "waystonewarps.bypass.icon")
-    }
-
-    /**
      * Checks if a player can relocate a waystone
      */
     fun canRelocate(player: Player, waystoneOwnerId: UUID): Boolean {

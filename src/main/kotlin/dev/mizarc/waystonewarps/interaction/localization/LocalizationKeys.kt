@@ -74,11 +74,6 @@ object LocalizationKeys {
     // Player Search Menu
     const val MENU_PLAYER_SEARCH_TITLE = "menu.player_search.title"
     
-    // Warp Icon Menu
-    const val MENU_WARP_ICON_TITLE = "menu.warp_icon.title"
-    const val MENU_WARP_ICON_INFO_ITEM_NAME = "menu.warp_icon.info_item.name"
-    const val MENU_WARP_ICON_INFO_ITEM_LORE = "menu.warp_icon.info_item.lore"
-    
     // Warp Management Menu
     const val MENU_WARP_MANAGEMENT_TITLE = "menu.warp_management.title"
     const val MENU_WARP_MANAGEMENT_ACCESS_NAME = "menu.warp_management.access.name"
@@ -91,8 +86,6 @@ object LocalizationKeys {
     const val MENU_WARP_MANAGEMENT_PLAYERS_LORE = "menu.warp_management.players.lore"
     const val MENU_WARP_MANAGEMENT_RENAME = "menu.warp_management.rename"
     const val MENU_WARP_MANAGEMENT_RENAME_LORE = "menu.warp_management.rename.lore"
-    const val MENU_WARP_MANAGEMENT_ICON = "menu.warp_management.icon"
-    const val MENU_WARP_MANAGEMENT_ICON_LORE = "menu.warp_management.icon.lore"
     const val MENU_WARP_MANAGEMENT_SKINS = "menu.warp_management.skins"
     const val MENU_WARP_MANAGEMENT_SKINS_LORE = "menu.warp_management.skins.lore"
     const val MENU_WARP_MANAGEMENT_MOVE = "menu.warp_management.move"

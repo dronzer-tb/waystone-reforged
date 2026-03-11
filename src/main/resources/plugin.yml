@@ -2,6 +2,9 @@ name: WaystoneWarps
 version: 1.0.0
 api-version: '1.21'
 main: dev.mizarc.waystonewarps.WaystoneWarps
+softdepend:
+  - GeyserMenuCompanion
+  - floodgate
 libraries:
   - org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0
   - org.jetbrains.kotlin:kotlin-stdlib:2.3.0
@@ -20,7 +23,6 @@ permissions:
       waystonewarps.bypass.access_control: true
       waystonewarps.bypass.manage_players: true
       waystonewarps.bypass.rename: true
-      waystonewarps.bypass.icon: true
       waystonewarps.bypass.relocate: true
       waystonewarps.bypass.open_menu: true
       waystonewarps.create: true
@@ -43,10 +45,6 @@ permissions:
 
   waystonewarps.bypass.rename:
     description: Can rename other waystones
-    default: op
-
-  waystonewarps.bypass.icon:
-    description: Can change other waystone icons
     default: op
 
   waystonewarps.bypass.relocate:

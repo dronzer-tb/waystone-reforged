@@ -1,6 +1,8 @@
 package dev.mizarc.waystonewarps.interaction.listeners
 
 import dev.mizarc.waystonewarps.application.services.ConfigService
+import dev.mizarc.waystonewarps.infrastructure.services.geyser.BedrockWarpMenu
+import dev.mizarc.waystonewarps.infrastructure.services.geyser.GeyserMenuIntegration
 import dev.mizarc.waystonewarps.interaction.localization.LocalizationProvider
 import dev.mizarc.waystonewarps.interaction.menus.MenuNavigator
 import dev.mizarc.waystonewarps.interaction.menus.use.WarpMenu
@@ -12,7 +14,10 @@ import org.bukkit.event.player.PlayerInteractEvent
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
-class WarpItemListener(private val configService: ConfigService): Listener, KoinComponent {
+class WarpItemListener(
+    private val configService: ConfigService,
+    private val geyserMenuIntegration: GeyserMenuIntegration? = null
+): Listener, KoinComponent {
     private val localizationProvider: LocalizationProvider by inject()
 
     @EventHandler
@@ -30,9 +35,14 @@ class WarpItemListener(private val configService: ConfigService): Listener, Koin
         // Check if the item is a compass and the action is a right-click
         if (itemInHand.type == Material.COMPASS &&
                 (event.action == Action.RIGHT_CLICK_AIR || event.action == Action.RIGHT_CLICK_BLOCK)) {
-            val menuNavigator = MenuNavigator(player)
-            val menu = WarpMenu(event.player, menuNavigator, localizationProvider)
-            menuNavigator.openMenu(menu)
+            if (geyserMenuIntegration?.isBedrockPlayer(player) == true) {
+                val api = geyserMenuIntegration.getApi() ?: return
+                BedrockWarpMenu(player, api).open()
+            } else {
+                val menuNavigator = MenuNavigator(player)
+                val menu = WarpMenu(event.player, menuNavigator, localizationProvider)
+                menuNavigator.openMenu(menu)
+            }
         }
     }
 }

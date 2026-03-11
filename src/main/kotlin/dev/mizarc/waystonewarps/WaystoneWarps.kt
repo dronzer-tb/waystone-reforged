@@ -21,7 +21,6 @@ import dev.mizarc.waystonewarps.application.actions.discovery.ToggleFavouriteDis
 import dev.mizarc.waystonewarps.application.actions.management.GetAllWarpSkins
 import dev.mizarc.waystonewarps.application.actions.management.GetOwnedWarps
 import dev.mizarc.waystonewarps.application.actions.management.ToggleLock
-import dev.mizarc.waystonewarps.application.actions.management.UpdateWarpIcon
 import dev.mizarc.waystonewarps.application.actions.management.UpdateWarpName
 import dev.mizarc.waystonewarps.application.actions.management.UpdateWarpSkin
 import dev.mizarc.waystonewarps.application.actions.whitelist.ToggleWhitelist
@@ -52,6 +51,7 @@ import dev.mizarc.waystonewarps.infrastructure.persistence.storage.Storage
 import dev.mizarc.waystonewarps.infrastructure.persistence.warps.WarpRepositorySQLite
 import dev.mizarc.waystonewarps.infrastructure.persistence.whitelist.WhitelistRepositorySQLite
 import dev.mizarc.waystonewarps.infrastructure.services.*
+import dev.mizarc.waystonewarps.infrastructure.services.geyser.GeyserMenuIntegration
 import dev.mizarc.waystonewarps.infrastructure.services.teleportation.TeleportationServiceBukkit
 import dev.mizarc.waystonewarps.infrastructure.services.scheduling.SchedulerServiceBukkit
 import dev.mizarc.waystonewarps.interaction.commands.InvalidsCommand
@@ -101,6 +101,7 @@ class WaystoneWarps: JavaPlugin() {
     private lateinit var warpEventPublisher: WarpEventPublisher
     private lateinit var playerLocaleService: PlayerLocaleService
     private lateinit var localizationProvider: LocalizationProvider
+    private var geyserMenuIntegration: GeyserMenuIntegration? = null
 
     override fun onEnable() {
         // Create plugin folder
@@ -135,6 +136,10 @@ class WaystoneWarps: JavaPlugin() {
         initialiseLang()
         registerDependencies()
         registerCommands()
+
+        // Initialise GeyserMenu integration before events (optional soft dependency)
+        initialiseGeyserMenu()
+
         registerEvents()
         AddAllDisplays(warpRepository, structureBuilderService, hologramService).execute()
 
@@ -150,6 +155,7 @@ class WaystoneWarps: JavaPlugin() {
     }
 
     override fun onDisable() {
+        geyserMenuIntegration?.shutdown()
         RemoveAllDisplays(warpRepository, structureBuilderService, hologramService).execute()
         logger.info("WaystoneWarps has been Disabled")
     }
@@ -229,7 +235,6 @@ class WaystoneWarps: JavaPlugin() {
                 discoveryRepository, structureParticleService, hologramService, warpEventPublisher) }
             single { GetWarpPlayerAccess(discoveryRepository) }
             single { GetPlayerWarpAccess(discoveryRepository, warpRepository) }
-            single { UpdateWarpIcon(warpRepository, warpEventPublisher) }
             single { UpdateWarpName(warpRepository, hologramService, warpEventPublisher) }
             single { GetWarpAtPosition(warpRepository) }
             single { BreakWarpBlock(warpRepository, structureBuilderService,
@@ -268,13 +273,27 @@ class WaystoneWarps: JavaPlugin() {
     }
 
     private fun registerEvents() {
-        server.pluginManager.registerEvents(WaystoneInteractListener(configService), this)
+        server.pluginManager.registerEvents(WaystoneInteractListener(configService, geyserMenuIntegration), this)
         server.pluginManager.registerEvents(WaystoneDestructionListener(), this)
         server.pluginManager.registerEvents(PlayerMovementListener(), this)
         server.pluginManager.registerEvents(MoveToolListener(), this)
         server.pluginManager.registerEvents(ToolRemovalListener(), this)
         server.pluginManager.registerEvents(TeleportZoneProtectionListener(), this)
-        server.pluginManager.registerEvents(WarpItemListener(configService), this)
+        server.pluginManager.registerEvents(WarpItemListener(configService, geyserMenuIntegration), this)
         server.pluginManager.registerEvents(WaystoneBaseInteractListener(), this)
     }
+
+    private fun initialiseGeyserMenu() {
+        try {
+            val integration = GeyserMenuIntegration(this)
+            integration.initialize()
+            if (integration.isEnabled()) {
+                geyserMenuIntegration = integration
+            }
+        } catch (e: NoClassDefFoundError) {
+            logger.info("GeyserMenu Companion classes not available. Bedrock menu integration disabled.")
+        }
+    }
+
+    fun getGeyserMenuIntegration(): GeyserMenuIntegration? = geyserMenuIntegration
 }

@@ -11,7 +11,6 @@ import dev.mizarc.waystonewarps.interaction.localization.LocalizationProvider
 import dev.mizarc.waystonewarps.interaction.menus.Menu
 import dev.mizarc.waystonewarps.interaction.menus.MenuNavigator
 import dev.mizarc.waystonewarps.interaction.messaging.PrimaryColourPalette
-import dev.mizarc.waystonewarps.interaction.utils.applyIconMeta
 import dev.mizarc.waystonewarps.interaction.utils.PermissionHelper
 import dev.mizarc.waystonewarps.interaction.utils.getWarpMoveTool
 import dev.mizarc.waystonewarps.interaction.utils.lore
@@ -146,25 +145,6 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
         }
         pane.addItem(guiRenamingItem, 3, 0)
 
-        // Add icon editor button
-        val canChangeIcon = PermissionHelper.canChangeIcon(player, warp.playerId)
-        val iconEditorItem = ItemStack(Material.valueOf(warp.icon)).applyIconMeta(warp.iconMeta)
-            .name(localizationProvider.get(player.uniqueId, LocalizationKeys.MENU_WARP_MANAGEMENT_ICON))
-        if (canChangeIcon) {
-            iconEditorItem.lore(localizationProvider.get(player.uniqueId, LocalizationKeys.MENU_WARP_MANAGEMENT_ICON_LORE))
-        } else {
-            iconEditorItem.lore(
-                localizationProvider.get(player.uniqueId, LocalizationKeys.MENU_WARP_MANAGEMENT_ICON_LORE),
-                localizationProvider.get(player.uniqueId, LocalizationKeys.MENU_WARP_MANAGEMENT_COMMON_NO_PERMISSION)
-            )
-        }
-        val guiIconEditorItem = GuiItem(iconEditorItem) {
-            if (canChangeIcon) {
-                menuNavigator.openMenu(WarpIconMenu(player, menuNavigator, warp))
-            }
-        }
-        pane.addItem(guiIconEditorItem, 4, 0)
-
         // Add skins menu
         val skinViewItem = ItemStack(Material.valueOf(warp.block))
             .name(localizationProvider.get(player.uniqueId, LocalizationKeys.MENU_WARP_MANAGEMENT_SKINS))
@@ -172,7 +152,7 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
         val guiSkinViewItem = GuiItem(skinViewItem) {
             menuNavigator.openMenu(WarpSkinsMenu(player, menuNavigator, localizationProvider))
         }
-        pane.addItem(guiSkinViewItem, 5, 0)
+        pane.addItem(guiSkinViewItem, 4, 0)
 
         // Add move icon
         val canRelocate = PermissionHelper.canRelocate(player, warp.playerId)

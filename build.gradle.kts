@@ -45,6 +45,10 @@ repositories {
     maven {
         url = uri("https://jitpack.io")
     }
+    maven {
+        name = "opencollab"
+        url = uri("https://repo.opencollab.dev/main/")
+    }
 }
 
 dependencies {
@@ -60,6 +64,10 @@ dependencies {
     implementation("com.github.stefvanschie.inventoryframework:IF:0.11.6")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7.1")
     compileOnly("me.xdrop:fuzzywuzzy:1.3.1")
+
+    // GeyserMenu Companion API (for Bedrock player form menus)
+    compileOnly("com.github.dronzer-tb.geyser-menu-companion:common:1.1.6")
+    compileOnly("org.geysermc.floodgate:api:2.2.3-SNAPSHOT")
 }
 
 java {
