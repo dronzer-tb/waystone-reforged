@@ -36,6 +36,7 @@ import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.inventory.ItemStack
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import java.util.UUID
 
 class WaystoneInteractListener(
     private val configService: ConfigService,
@@ -48,6 +49,10 @@ class WaystoneInteractListener(
     private val localizationProvider: LocalizationProvider by inject()
 
     private val openOtherMenuPermission = "waystonewarps.bypass.open_menu"
+
+    // Debounce for Bedrock players to prevent repeated interactions
+    private val bedrockInteractCooldowns = mutableMapOf<UUID, Long>()
+    private val BEDROCK_COOLDOWN_MS = 1000L
 
     private fun isBedrockPlayer(player: Player): Boolean {
         return geyserMenuIntegration?.isBedrockPlayer(player) == true
@@ -91,6 +96,15 @@ class WaystoneInteractListener(
             // Check if warp is locked and alert if no access
             player.swingMainHand()
             event.isCancelled = true
+
+            // Debounce Bedrock players to prevent repeated interactions
+            if (isBedrockPlayer(player)) {
+                val now = System.currentTimeMillis()
+                val last = bedrockInteractCooldowns[player.uniqueId] ?: 0L
+                if (now - last < BEDROCK_COOLDOWN_MS) return
+                bedrockInteractCooldowns[player.uniqueId] = now
+            }
+
             val isOwner = warp.playerId == player.uniqueId
             val canOpenOtherMenu = player.hasPermission(openOtherMenuPermission)
             val isAdminMenuOpenAttempt = !isOwner && canOpenOtherMenu && player.isSneaking
