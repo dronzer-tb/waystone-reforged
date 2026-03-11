@@ -22,8 +22,9 @@ class HologramServiceBukkit(private val configService: ConfigService): HologramS
         val location = warp.position.toLocation(world)
 
         // Create the display component consisting of a name and coordinates
+        val nameColor = if (warp.isProtected) NamedTextColor.DARK_BLUE else NamedTextColor.GOLD
         val nameComponent = Component.text(warp.name)
-            .color(NamedTextColor.GOLD)
+            .color(nameColor)
             .decorate(TextDecoration.BOLD)
         val coordinatesComponent = Component.text("X: ${warp.position.x}  Y: ${warp.position.y}  Z: ${warp.position.z}")
             .color(NamedTextColor.GRAY)

@@ -7,7 +7,10 @@ import dev.mizarc.waystonewarps.application.actions.discovery.GetWarpPlayerAcces
 import dev.mizarc.waystonewarps.application.actions.management.ToggleHome
 import dev.mizarc.waystonewarps.application.actions.management.ToggleLock
 import dev.mizarc.waystonewarps.application.actions.management.ToggleProtection
+import dev.mizarc.waystonewarps.application.services.ConfigService
+import dev.mizarc.waystonewarps.application.services.PlayerAttributeService
 import dev.mizarc.waystonewarps.domain.warps.Warp
+import dev.mizarc.waystonewarps.infrastructure.services.teleportation.CostType
 import dev.mizarc.waystonewarps.interaction.localization.LocalizationKeys
 import dev.mizarc.waystonewarps.interaction.localization.LocalizationProvider
 import dev.mizarc.waystonewarps.interaction.menus.Menu
@@ -20,6 +23,8 @@ import dev.mizarc.waystonewarps.interaction.utils.name
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.format.TextDecoration
+import net.milkbowl.vault.economy.Economy
+import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
@@ -33,6 +38,8 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
     private val toggleHome: ToggleHome by inject()
     private val toggleProtection: ToggleProtection by inject()
     private val localizationProvider: LocalizationProvider by inject()
+    private val configService: ConfigService by inject()
+    private val playerAttributeService: PlayerAttributeService by inject()
 
     override fun open() {
         val title = localizationProvider.get(player.uniqueId, LocalizationKeys.MENU_WARP_MANAGEMENT_TITLE, warp.name)
@@ -130,22 +137,31 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
         }
         pane.addItem(guiPlayerCountItem, 1, 0)
 
-        // Slot 2: Home toggle
+        // Slot 2: Home toggle (free to set, costs to unset)
         val canSetHome = PermissionHelper.canModifyWaystone(player, warp.playerId, "waystonewarps.home")
+        val baseCost = playerAttributeService.getTeleportCost(player.uniqueId)
+        val homeUnsetCost = baseCost * configService.getHomeUnsetCostMultiplier()
         val homeItem = if (warp.isHome) {
             ItemStack(Material.RED_BED)
                 .name(Component.text("Home", NamedTextColor.GREEN).decoration(TextDecoration.ITALIC, false))
-                .lore("§7This waystone is set as your home.", "§eClick to unset home.")
+                .lore("§7This waystone is set as your home.", "§7Cost to unset: §e${homeUnsetCost.toInt()}", "§eClick to unset home.")
         } else {
             ItemStack(Material.WHITE_BED)
                 .name(Component.text("Home", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false))
-                .lore("§7Set this waystone as your home.", "§7Home warps have reduced teleport cost.", "§eClick to set as home.")
+                .lore("§7Set this waystone as your home.", "§7Home warps have reduced teleport cost.", "§aFree to set!", "§eClick to set as home.")
         }
         if (!canSetHome) {
             homeItem.lore("§7Home waystone setting.", "§cYou don't have permission.")
         }
         val guiHomeItem = GuiItem(homeItem) {
             if (canSetHome) {
+                // Unsetting home costs money
+                if (warp.isHome) {
+                    if (!checkAndDeductCost(player, homeUnsetCost)) {
+                        player.sendMessage(Component.text("Not enough funds to unset home!", NamedTextColor.RED))
+                        return@GuiItem
+                    }
+                }
                 toggleHome.execute(
                     playerId = player.uniqueId,
                     warpId = warp.id,
@@ -184,22 +200,30 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
         }
         pane.addItem(guiSkinViewItem, 4, 0)
 
-        // Slot 5: Protection mode
+        // Slot 5: Protection mode (costs to enable, free to disable)
         val canToggleProtection = PermissionHelper.canModifyWaystone(player, warp.playerId, "waystonewarps.bypass.protection")
+        val protectionEnableCost = baseCost * configService.getProtectionModeCostMultiplier()
         val protectionItem = if (warp.isProtected) {
             ItemStack(Material.OBSIDIAN)
                 .name(Component.text("Protection: On", NamedTextColor.GREEN).decoration(TextDecoration.ITALIC, false))
-                .lore("§7Only the owner can break this waystone.", "§7Other players take damage when attempting.", "§eClick to disable protection.")
+                .lore("§7Only the owner can break this waystone.", "§7Other players take damage when attempting.", "§aFree to disable.", "§eClick to disable protection.")
         } else {
             ItemStack(Material.CRYING_OBSIDIAN)
                 .name(Component.text("Protection: Off", NamedTextColor.RED).decoration(TextDecoration.ITALIC, false))
-                .lore("§7Anyone can break this waystone.", "§eClick to enable protection.")
+                .lore("§7Anyone can break this waystone.", "§7Cost to enable: §e${protectionEnableCost.toInt()}", "§eClick to enable protection.")
         }
         if (!canToggleProtection) {
             protectionItem.lore("§7Waystone protection mode.", "§cYou don't have permission.")
         }
         val guiProtectionItem = GuiItem(protectionItem) {
             if (canToggleProtection) {
+                // Enabling protection costs money
+                if (!warp.isProtected) {
+                    if (!checkAndDeductCost(player, protectionEnableCost)) {
+                        player.sendMessage(Component.text("Not enough funds to enable protection!", NamedTextColor.RED))
+                        return@GuiItem
+                    }
+                }
                 toggleProtection.execute(
                     playerId = player.uniqueId,
                     warpId = warp.id,
@@ -236,6 +260,48 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
         pane.addItem(guiMoveItem, 8, 0)
 
         gui.show(player)
+    }
+
+    private fun checkAndDeductCost(player: Player, cost: Double): Boolean {
+        if (cost <= 0) return true
+        return when (configService.getTeleportCostType()) {
+            CostType.MONEY -> {
+                val economy = Bukkit.getServicesManager().getRegistration(Economy::class.java)?.provider
+                if (economy?.has(player, cost) == true) {
+                    economy.withdrawPlayer(player, cost)
+                    true
+                } else false
+            }
+            CostType.XP -> {
+                if (player.totalExperience >= cost.toInt()) {
+                    player.giveExp(-cost.toInt())
+                    true
+                } else false
+            }
+            CostType.ITEM -> {
+                val material = try {
+                    Material.valueOf(configService.getTeleportCostItem())
+                } catch (_: IllegalArgumentException) {
+                    Material.ENDER_PEARL
+                }
+                val needed = cost.toInt()
+                var count = 0
+                for (item in player.inventory.contents.filterNotNull()) {
+                    if (item.type == material) count += item.amount
+                }
+                if (count < needed) return false
+                var remaining = needed
+                for (item in player.inventory.contents.filterNotNull()) {
+                    if (item.type == material) {
+                        val remove = minOf(item.amount, remaining)
+                        item.amount -= remove
+                        remaining -= remove
+                        if (remaining <= 0) break
+                    }
+                }
+                true
+            }
+        }
     }
 
     private fun givePlayerMoveTool(player: Player) {

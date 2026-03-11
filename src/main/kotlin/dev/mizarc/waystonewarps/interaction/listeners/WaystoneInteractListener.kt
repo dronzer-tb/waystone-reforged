@@ -52,7 +52,7 @@ class WaystoneInteractListener(
 
     // Debounce for Bedrock players to prevent repeated interactions
     private val bedrockInteractCooldowns = mutableMapOf<UUID, Long>()
-    private val BEDROCK_COOLDOWN_MS = 1000L
+    private val BEDROCK_COOLDOWN_MS = 3000L
 
     private fun isBedrockPlayer(player: Player): Boolean {
         return geyserMenuIntegration?.isBedrockPlayer(player) == true
@@ -144,24 +144,25 @@ class WaystoneInteractListener(
                     return
                 }
 
-                if (configService.allowWarpsMenuViaWaystone()) {
-                    openWarpMenuFor(player, menuNavigator)
-                }
-
                 // Check if player has permission to discover warps
                 if (!player.hasPermission("waystonewarps.discover")) {
                     player.sendActionBar(Component.text("You don't have permission to discover warps").color(PrimaryColourPalette.FAILED.color))
                     return
                 }
 
+                // Try to discover first
                 val result = discoverWarp.execute(player.uniqueId, it.id)
                 if (result) {
                     player.sendActionBar(Component.text("Warp ").color(PrimaryColourPalette.SUCCESS.color)
                         .append(Component.text(warp.name).color(AccentColourPalette.SUCCESS.color))
                         .append(Component.text( " has been discovered!").color(PrimaryColourPalette.SUCCESS.color)))
                     clickedBlock.world.spawnParticle(Particle.TOTEM_OF_UNDYING, particleLocation, 20)
-                    clickedBlock.world.playSound(particleLocation, Sound.BLOCK_AMETHYST_BLOCK_HIT, SoundCategory.BLOCKS, 1.0f, 1.0f)
+                    // Skip sound for Bedrock players to prevent audio looping
+                    if (!isBedrockPlayer(player)) {
+                        clickedBlock.world.playSound(particleLocation, Sound.BLOCK_AMETHYST_BLOCK_HIT, SoundCategory.BLOCKS, 1.0f, 1.0f)
+                    }
                 } else {
+                    // Already discovered - open warp menu if allowed
                     if (configService.allowWarpsMenuViaWaystone()) {
                         openWarpMenuFor(player, menuNavigator)
                     }

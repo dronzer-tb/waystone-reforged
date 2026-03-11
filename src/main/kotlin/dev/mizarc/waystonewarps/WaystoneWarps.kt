@@ -254,7 +254,7 @@ class WaystoneWarps: JavaPlugin() {
             single { GetWhitelistedPlayers(whitelistRepository) }
             single { ToggleWhitelist(whitelistRepository, warpRepository) }
             single { ToggleHome(warpRepository, hologramService, warpEventPublisher) }
-            single { ToggleProtection(warpRepository, warpEventPublisher) }
+            single { ToggleProtection(warpRepository, hologramService, warpEventPublisher) }
             single { GetHomeWarp(warpRepository) }
             single { RevokeDiscovery(discoveryRepository) }
             single { IsPositionInTeleportZone(warpRepository) }
@@ -271,6 +271,8 @@ class WaystoneWarps: JavaPlugin() {
 
             single<LocalizationProvider> { PropertiesLocalizationProvider(configService, dataFolder, playerLocaleService) }
             single<TeleportationService> { teleportationService }
+            single<ConfigService> { configService }
+            single<PlayerAttributeService> { playerAttributeService }
         }
 
         startKoin { modules(repositories, actions) }

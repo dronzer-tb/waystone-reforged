@@ -1,11 +1,13 @@
 package dev.mizarc.waystonewarps.application.actions.management
 
+import dev.mizarc.waystonewarps.application.services.HologramService
 import dev.mizarc.waystonewarps.application.services.WarpEventPublisher
 import dev.mizarc.waystonewarps.domain.warps.WarpRepository
 import java.util.*
 
 class ToggleProtection(
     private val warpRepository: WarpRepository,
+    private val hologramService: HologramService,
     private val warpEventPublisher: WarpEventPublisher
 ) {
     fun execute(playerId: UUID, warpId: UUID, bypassOwnership: Boolean = false): Result<Unit> {
@@ -18,6 +20,7 @@ class ToggleProtection(
         val oldWarp = warp.copy()
         warp.isProtected = !warp.isProtected
         warpRepository.update(warp)
+        hologramService.updateHologram(warp)
         warpEventPublisher.warpModified(oldWarp, warp)
         return Result.success(Unit)
     }
