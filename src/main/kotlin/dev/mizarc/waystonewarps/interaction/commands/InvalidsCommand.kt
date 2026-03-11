@@ -18,7 +18,7 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.util.*
 
-@CommandAlias("waystonewarps|ww")
+@CommandAlias("waystonewarps")
 class InvalidsCommand : BaseCommand(), KoinComponent {
     private val listInvalidWarps: ListInvalidWarps by inject()
     private val removeAllInvalidWarps: RemoveAllInvalidWarps by inject()

@@ -15,7 +15,7 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
-@CommandAlias("warpmenu")
+@CommandAlias("warpmenu|ww")
 @CommandPermission("waystonewarps.command.warpmenu")
 class WarpMenuCommand: BaseCommand(), KoinComponent {
     private val localizationProvider: LocalizationProvider by inject()

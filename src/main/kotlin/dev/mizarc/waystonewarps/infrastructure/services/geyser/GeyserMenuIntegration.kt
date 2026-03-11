@@ -110,7 +110,7 @@ class GeyserMenuIntegration(
                 .onClick { playerObj, _ ->
                     val player = playerObj as? Player ?: return@onClick
                     Bukkit.getScheduler().runTask(plugin, Runnable {
-                        BedrockWarpMenu(player, api).open()
+                        player.performCommand("ww")
                     })
                 }
                 .build()
