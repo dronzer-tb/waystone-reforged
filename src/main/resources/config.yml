@@ -34,6 +34,20 @@ warps_menu_via_waystone: false
 # If a hologram should display above the waystone showing its name and location.
 holograms_enabled: true
 
+# GeyserMenu integration for Bedrock player support.
+# Requires the GeyserMenu Companion plugin and/or Floodgate to be installed.
+# When enabled, Bedrock players receive native form-based menus instead of
+# inventory GUIs.
+geyser:
+  # Whether the GeyserMenu integration is enabled.
+  enabled: true
+  # The text displayed on the menu button in the GeyserMenu main menu.
+  menu_button_text: "Waystone Warps"
+  # The priority of the button in the GeyserMenu (lower = higher in list).
+  menu_button_priority: 50
+  # The image path for the button icon (resource pack texture path).
+  menu_button_image: "textures/items/compass_item"
+
 # The blocks that can be used to transform the waystone appearance. This
 # contains all the required blocks that make up the waystone that must be in the
 # following order:

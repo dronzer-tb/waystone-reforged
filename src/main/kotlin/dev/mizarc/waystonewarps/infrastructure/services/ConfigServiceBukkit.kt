@@ -56,4 +56,20 @@ class ConfigServiceBukkit(private val configFile: FileConfiguration): ConfigServ
     override fun hologramsEnabled(): Boolean {
         return configFile.getBoolean("holograms_enabled")
     }
+
+    override fun isGeyserEnabled(): Boolean {
+        return configFile.getBoolean("geyser.enabled", true)
+    }
+
+    override fun getGeyserMenuButtonText(): String {
+        return configFile.getString("geyser.menu_button_text", "Waystone Warps").toString()
+    }
+
+    override fun getGeyserMenuButtonPriority(): Int {
+        return configFile.getInt("geyser.menu_button_priority", 50)
+    }
+
+    override fun getGeyserMenuButtonImage(): String {
+        return configFile.getString("geyser.menu_button_image", "textures/items/compass_item").toString()
+    }
 }

@@ -15,4 +15,10 @@ interface ConfigService {
     fun allowWarpsMenuViaCompass(): Boolean
     fun allowWarpsMenuViaWaystone(): Boolean
     fun hologramsEnabled(): Boolean
+
+    // Geyser integration
+    fun isGeyserEnabled(): Boolean
+    fun getGeyserMenuButtonText(): String
+    fun getGeyserMenuButtonPriority(): Int
+    fun getGeyserMenuButtonImage(): String
 }

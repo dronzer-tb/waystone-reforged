@@ -285,7 +285,7 @@ class WaystoneWarps: JavaPlugin() {
 
     private fun initialiseGeyserMenu() {
         try {
-            val integration = GeyserMenuIntegration(this)
+            val integration = GeyserMenuIntegration(this, configService)
             integration.initialize()
             if (integration.isEnabled()) {
                 geyserMenuIntegration = integration
