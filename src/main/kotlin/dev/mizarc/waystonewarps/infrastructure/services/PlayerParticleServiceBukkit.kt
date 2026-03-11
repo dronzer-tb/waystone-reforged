@@ -6,6 +6,7 @@ import dev.mizarc.waystonewarps.application.services.PlayerParticleService
 import org.bukkit.Bukkit
 import org.bukkit.Particle
 import org.bukkit.Sound
+import org.bukkit.SoundCategory
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
 import org.bukkit.scheduler.BukkitTask
@@ -21,7 +22,6 @@ class PlayerParticleServiceBukkit(private val plugin: JavaPlugin,
         val particles = object : BukkitRunnable() {
             var teleportTime = playerAttributeService.getTeleportTimer(playerId) * 20
             override fun run() {
-                // Cancel is player goes offline
                 if (!player.isOnline) {
                     cancel()
                     return
@@ -29,10 +29,10 @@ class PlayerParticleServiceBukkit(private val plugin: JavaPlugin,
 
                 teleportTime -= 1
                 if (teleportTime == 80) {
-                    player.world.playSound(player.location, Sound.BLOCK_PORTAL_TRIGGER, 1.0f, 1.0f)
+                    player.playSound(player.location, Sound.BLOCK_PORTAL_TRIGGER, SoundCategory.BLOCKS, 1.0f, 1.0f)
                 }
 
-                player.world.spawnParticle(Particle.PORTAL, player.location, 1)
+                player.spawnParticle(Particle.PORTAL, player.location, 1)
             }
         }.runTaskTimer(plugin, 0L, 1L)
         activeParticles[player.uniqueId] = particles
@@ -45,10 +45,10 @@ class PlayerParticleServiceBukkit(private val plugin: JavaPlugin,
             .location(playerLocation)
             .offset(0.5, 1.0, 0.5)
             .count(100)
+            .receivers(player)
             .spawn()
 
-        // Play teleport sound
-        playerLocation.world.playSound(playerLocation, Sound.ENTITY_PLAYER_TELEPORT, 1.0f, 1.0f)
+        player.playSound(playerLocation, Sound.ENTITY_PLAYER_TELEPORT, SoundCategory.PLAYERS, 1.0f, 1.0f)
     }
 
     override fun removeParticles(playerId: UUID) {

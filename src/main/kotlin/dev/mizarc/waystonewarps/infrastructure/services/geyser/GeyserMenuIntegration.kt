@@ -1,32 +1,39 @@
 package dev.mizarc.waystonewarps.infrastructure.services.geyser
 
+import dev.mizarc.waystonewarps.application.actions.management.GetHomeWarp
+import dev.mizarc.waystonewarps.application.actions.teleport.TeleportPlayer
+import dev.mizarc.waystonewarps.interaction.localization.LocalizationKeys
+import dev.mizarc.waystonewarps.interaction.localization.LocalizationProvider
+import dev.mizarc.waystonewarps.interaction.messaging.PrimaryColourPalette
+import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.plugin.java.JavaPlugin
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 import java.lang.reflect.Method
 import java.util.UUID
 import java.util.logging.Logger
 
 /**
  * Handles GeyserMenu Companion integration.
- * Registers a "Waystone Warps" button in the Bedrock main menu.
- * Uses pure reflection (no compile-time dependency) with proper
- * BedrockPlayer UUID extraction matching the GeyserMenu API pattern.
+ * Registers "Warp" and "Home" buttons in the Bedrock main menu.
  */
-class GeyserMenuIntegration(private val plugin: JavaPlugin) {
+class GeyserMenuIntegration(private val plugin: JavaPlugin) : KoinComponent {
     private val logger: Logger = plugin.logger
     private var geyserMenuApi: Any? = null
     private var apiClass: Class<*>? = null
     private var isAvailable = false
-    private var warpButtonRegistered = false
+    private var buttonsRegistered = false
+
+    private val getHomeWarp: GetHomeWarp by inject()
+    private val teleportPlayer: TeleportPlayer by inject()
+    private val localizationProvider: LocalizationProvider by inject()
 
     companion object {
         private const val WARP_BUTTON_ID = "waystonewarps-warp"
+        private const val HOME_BUTTON_ID = "waystonewarps-home"
     }
 
-    /**
-     * Finds a method on an object by searching interfaces and superclasses first
-     * (public API types) to avoid IllegalAccessException on private inner classes.
-     */
     private fun findMethod(obj: Any, name: String, vararg paramTypes: Class<*>): Method {
         for (iface in obj.javaClass.interfaces) {
             try { return iface.getMethod(name, *paramTypes) } catch (_: NoSuchMethodException) {}
@@ -40,7 +47,6 @@ class GeyserMenuIntegration(private val plugin: JavaPlugin) {
     }
 
     fun initialize(): Boolean {
-        // First initialize BedrockSupport (forms engine)
         val formsAvailable = BedrockSupport.initialize(plugin)
         if (!formsAvailable) {
             logger.info("[GeyserMenu] BedrockSupport not available.")
@@ -56,9 +62,8 @@ class GeyserMenuIntegration(private val plugin: JavaPlugin) {
                 isAvailable = true
                 logger.info("[GeyserMenu] API available - registering buttons with delay")
 
-                // Delay button registration by 40 ticks (2s) so GeyserMenu is fully ready
                 plugin.server.scheduler.runTaskLater(plugin, Runnable {
-                    registerWarpButton()
+                    registerButtons()
                 }, 40L)
 
                 return true
@@ -74,67 +79,80 @@ class GeyserMenuIntegration(private val plugin: JavaPlugin) {
         return false
     }
 
-    /**
-     * Registers the main "Warp" button in GeyserMenu.
-     * Uses the MenuButton.builder() pattern with proper BiConsumer<BedrockPlayer, Session>.
-     */
-    private fun registerWarpButton() {
-        if (!isAvailable || geyserMenuApi == null || warpButtonRegistered) return
+    private fun registerButtons() {
+        if (!isAvailable || geyserMenuApi == null || buttonsRegistered) return
+        registerButton(
+            id = WARP_BUTTON_ID,
+            text = "§l§8Warp",
+            imagePath = "textures/blocks/lodestone_top",
+            priority = 20
+        ) { player ->
+            BedrockWarpMenu(player).open()
+        }
+        registerButton(
+            id = HOME_BUTTON_ID,
+            text = "§l§8Home",
+            imagePath = "textures/items/bed_red",
+            priority = 21
+        ) { player ->
+            val homeWarp = getHomeWarp.execute(player.uniqueId)
+            if (homeWarp == null) {
+                player.sendMessage("§cYou don't have a home waystone set.")
+                return@registerButton
+            }
+            teleportPlayer.execute(
+                player.uniqueId, homeWarp,
+                onPending = { player.sendMessage("§eTeleporting to home...") },
+                onSuccess = { player.sendMessage("§aTeleported to home!") },
+                onFailure = { player.sendMessage("§cTeleportation failed.") },
+                onInsufficientFunds = { player.sendMessage("§cNot enough funds to teleport home.") },
+                onWorldNotFound = { player.sendMessage("§cWorld not found.") },
+                onLocked = { player.sendMessage("§cHome waystone is locked.") },
+                onCanceled = { player.sendMessage("§eTeleportation cancelled.") },
+                onPermissionDenied = { player.sendMessage("§cNo teleport permission.") },
+                onInterworldPermissionDenied = { player.sendMessage("§cNo cross-world teleport permission.") }
+            )
+        }
+        buttonsRegistered = true
+        logger.info("[GeyserMenu] Warp and Home buttons registered successfully")
+    }
 
+    private fun registerButton(id: String, text: String, imagePath: String, priority: Int, onClick: (org.bukkit.entity.Player) -> Unit) {
         try {
             val menuButtonClass = Class.forName("com.geysermenu.companion.api.MenuButton")
-
-            // Use MenuButton.builder() — get method return type for public interface
             val builderMethod = menuButtonClass.getMethod("builder")
             val builder = builderMethod.invoke(null)
-            val builderType = builderMethod.returnType
+            val bt = builderMethod.returnType
 
-            // Set button properties through public type
-            val idMethod = builderType.getMethod("id", String::class.java)
-            val textMethod = builderType.getMethod("text", String::class.java)
-            val imagePathMethod = builderType.getMethod("imagePath", String::class.java)
-            val priorityMethod = builderType.getMethod("priority", Int::class.javaPrimitiveType)
-            val onClickMethod = builderType.getMethod("onClick", java.util.function.BiConsumer::class.java)
-            val buildMethod = builderType.getMethod("build")
+            bt.getMethod("id", String::class.java).invoke(builder, id)
+            bt.getMethod("text", String::class.java).invoke(builder, text)
+            bt.getMethod("imagePath", String::class.java).invoke(builder, imagePath)
+            bt.getMethod("priority", Int::class.javaPrimitiveType).invoke(builder, priority)
 
-            idMethod.invoke(builder, WARP_BUTTON_ID)
-            textMethod.invoke(builder, "§5Waystone Warps")
-            imagePathMethod.invoke(builder, "textures/blocks/lodestone_top")
-            priorityMethod.invoke(builder, 20)
-
-            // onClick handler receives BedrockPlayer and session — extract UUID via reflection
             val pluginRef = plugin
             val loggerRef = logger
             val clickHandler = java.util.function.BiConsumer<Any, Any?> { bedrockPlayer, _ ->
                 try {
-                    val getUuidMethod = findMethod(bedrockPlayer, "getUuid")
-                    val uuid = getUuidMethod.invoke(bedrockPlayer) as UUID
-
+                    val uuid = findMethod(bedrockPlayer, "getUuid").invoke(bedrockPlayer) as UUID
                     Bukkit.getScheduler().runTask(pluginRef, Runnable {
                         val bukkitPlayer = Bukkit.getPlayer(uuid)
                         if (bukkitPlayer != null) {
-                            bukkitPlayer.performCommand("ww")
+                            onClick(bukkitPlayer)
                         } else {
                             loggerRef.warning("[GeyserMenu] Could not find Bukkit player for UUID: $uuid")
                         }
                     })
                 } catch (e: Exception) {
                     loggerRef.warning("[GeyserMenu] Error handling button click: ${e.message}")
-                    e.printStackTrace()
                 }
             }
-            onClickMethod.invoke(builder, clickHandler)
+            bt.getMethod("onClick", java.util.function.BiConsumer::class.java).invoke(builder, clickHandler)
 
-            val button = buildMethod.invoke(builder)
-
-            val registerMethod = apiClass!!.getMethod("registerButton", menuButtonClass)
-            registerMethod.invoke(geyserMenuApi, button)
-
-            warpButtonRegistered = true
-            logger.info("[GeyserMenu] Warp button registered successfully")
+            val button = bt.getMethod("build").invoke(builder)
+            apiClass!!.getMethod("registerButton", menuButtonClass).invoke(geyserMenuApi, button)
+            logger.info("[GeyserMenu] Button '$id' registered")
         } catch (e: Exception) {
-            logger.warning("[GeyserMenu] Failed to register Warp button: ${e.message}")
-            e.printStackTrace()
+            logger.warning("[GeyserMenu] Failed to register button '$id': ${e.message}")
         }
     }
 
@@ -144,10 +162,11 @@ class GeyserMenuIntegration(private val plugin: JavaPlugin) {
 
         try {
             val unregisterMethod = apiClass!!.getMethod("unregisterButton", String::class.java)
-            if (warpButtonRegistered) {
+            if (buttonsRegistered) {
                 unregisterMethod.invoke(geyserMenuApi, WARP_BUTTON_ID)
-                warpButtonRegistered = false
-                logger.info("[GeyserMenu] Warp button unregistered")
+                unregisterMethod.invoke(geyserMenuApi, HOME_BUTTON_ID)
+                buttonsRegistered = false
+                logger.info("[GeyserMenu] Buttons unregistered")
             }
         } catch (_: Exception) {}
     }

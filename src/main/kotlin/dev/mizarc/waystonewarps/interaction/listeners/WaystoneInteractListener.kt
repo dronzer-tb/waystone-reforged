@@ -170,13 +170,10 @@ class WaystoneInteractListener(
                     if (!recentDiscoveryEffects.contains(discoveryKey)) {
                         recentDiscoveryEffects.add(discoveryKey)
 
-                        // Use player-specific methods to avoid sending TOTEM_OF_UNDYING to
-                        // nearby Bedrock clients (which loop the totem animation/sound).
-                        // Also skip entirely for Bedrock discoverers.
-                        if (!isBedrockPlayer(player)) {
-                            player.spawnParticle(Particle.TOTEM_OF_UNDYING, particleLocation, 20)
-                            player.playSound(particleLocation, Sound.BLOCK_AMETHYST_BLOCK_HIT, SoundCategory.BLOCKS, 1.0f, 1.0f)
-                        }
+                        // Use HAPPY_VILLAGER (safe on Bedrock) instead of TOTEM_OF_UNDYING
+                        // which triggers a full looping totem animation on Bedrock clients.
+                        player.spawnParticle(Particle.HAPPY_VILLAGER, particleLocation, 30, 0.5, 0.5, 0.5)
+                        player.playSound(particleLocation, Sound.BLOCK_AMETHYST_BLOCK_HIT, SoundCategory.BLOCKS, 1.0f, 1.0f)
 
                         // Clean up the guard entry after 10 seconds
                         Bukkit.getScheduler().runTaskLater(
