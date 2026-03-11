@@ -286,27 +286,24 @@ class WaystoneWarps: JavaPlugin() {
     }
 
     private fun registerEvents() {
-        server.pluginManager.registerEvents(WaystoneInteractListener(configService, geyserMenuIntegration), this)
+        server.pluginManager.registerEvents(WaystoneInteractListener(configService), this)
         server.pluginManager.registerEvents(WaystoneDestructionListener(), this)
         server.pluginManager.registerEvents(PlayerMovementListener(), this)
         server.pluginManager.registerEvents(MoveToolListener(), this)
         server.pluginManager.registerEvents(ToolRemovalListener(), this)
         server.pluginManager.registerEvents(TeleportZoneProtectionListener(), this)
-        server.pluginManager.registerEvents(WarpItemListener(configService, geyserMenuIntegration), this)
+        server.pluginManager.registerEvents(WarpItemListener(configService), this)
         server.pluginManager.registerEvents(WaystoneBaseInteractListener(), this)
     }
 
     private fun initialiseGeyserMenu() {
         try {
-            val integration = GeyserMenuIntegration(this, configService)
-            integration.initialize()
-            if (integration.isEnabled()) {
+            val integration = GeyserMenuIntegration(this)
+            if (integration.initialize()) {
                 geyserMenuIntegration = integration
             }
-        } catch (e: NoClassDefFoundError) {
-            logger.info("GeyserMenu Companion classes not available. Bedrock menu integration disabled.")
+        } catch (e: Exception) {
+            logger.info("GeyserMenu Companion not available. Bedrock menu integration disabled.")
         }
     }
-
-    fun getGeyserMenuIntegration(): GeyserMenuIntegration? = geyserMenuIntegration
 }

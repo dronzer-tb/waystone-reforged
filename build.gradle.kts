@@ -65,9 +65,7 @@ dependencies {
     compileOnly("com.github.MilkBowl:VaultAPI:1.7.1")
     compileOnly("me.xdrop:fuzzywuzzy:1.3.1")
 
-    // GeyserMenu Companion API (for Bedrock player form menus)
-    compileOnly("com.github.dronzer-tb.geyser-menu-companion:common:1.1.6")
-    compileOnly("org.geysermc.floodgate:api:2.2.3-SNAPSHOT")
+    // GeyserMenu + Floodgate: accessed via pure reflection at runtime (no compile dependency needed)
 }
 
 java {

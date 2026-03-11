@@ -6,11 +6,11 @@ import dev.mizarc.waystonewarps.application.actions.world.GetWarpAtPosition
 import dev.mizarc.waystonewarps.application.actions.world.IsValidWarpBase
 import dev.mizarc.waystonewarps.application.services.ConfigService
 import dev.mizarc.waystonewarps.infrastructure.mappers.toPosition3D
+import dev.mizarc.waystonewarps.infrastructure.services.geyser.BedrockSupport
 import dev.mizarc.waystonewarps.infrastructure.services.geyser.BedrockWarpManagementMenu
 import dev.mizarc.waystonewarps.infrastructure.services.geyser.BedrockWarpMenu
 import dev.mizarc.waystonewarps.infrastructure.services.geyser.BedrockWarpNamingMenu
 import dev.mizarc.waystonewarps.interaction.localization.LocalizationKeys
-import dev.mizarc.waystonewarps.infrastructure.services.geyser.GeyserMenuIntegration
 import dev.mizarc.waystonewarps.interaction.localization.LocalizationProvider
 import dev.mizarc.waystonewarps.interaction.menus.MenuNavigator
 import dev.mizarc.waystonewarps.interaction.menus.management.WarpManagementMenu
@@ -40,8 +40,7 @@ import org.koin.core.component.inject
 import java.util.UUID
 
 class WaystoneInteractListener(
-    private val configService: ConfigService,
-    private val geyserMenuIntegration: GeyserMenuIntegration? = null
+    private val configService: ConfigService
 ): Listener, KoinComponent {
     private val getWarpAtPosition: GetWarpAtPosition by inject()
     private val discoverWarp: DiscoverWarp by inject()
@@ -59,13 +58,12 @@ class WaystoneInteractListener(
     private val recentDiscoveryEffects = mutableSetOf<Pair<UUID, UUID>>()
 
     private fun isBedrockPlayer(player: Player): Boolean {
-        return geyserMenuIntegration?.isBedrockPlayer(player) == true
+        return BedrockSupport.isBedrockPlayer(player)
     }
 
     private fun openWarpMenuFor(player: Player, menuNavigator: MenuNavigator) {
         if (isBedrockPlayer(player)) {
-            val api = geyserMenuIntegration?.getApi() ?: return
-            BedrockWarpMenu(player, api).open()
+            BedrockWarpMenu(player).open()
         } else {
             menuNavigator.openMenu(WarpMenu(player, menuNavigator, localizationProvider))
         }
@@ -73,8 +71,7 @@ class WaystoneInteractListener(
 
     private fun openManagementMenuFor(player: Player, menuNavigator: MenuNavigator, warp: dev.mizarc.waystonewarps.domain.warps.Warp) {
         if (isBedrockPlayer(player)) {
-            val api = geyserMenuIntegration?.getApi() ?: return
-            BedrockWarpManagementMenu(player, api, warp).open()
+            BedrockWarpManagementMenu(player, warp).open()
         } else {
             menuNavigator.openMenu(WarpManagementMenu(player, menuNavigator, warp))
         }
@@ -215,8 +212,7 @@ class WaystoneInteractListener(
 
             // Open the naming menu (Bedrock custom form or Java anvil GUI)
             if (isBedrockPlayer(player)) {
-                val api = geyserMenuIntegration?.getApi() ?: return
-                BedrockWarpNamingMenu(player, api, clickedBlock.location).open()
+                BedrockWarpNamingMenu(player, clickedBlock.location).open()
             } else {
                 menuNavigator.openMenu(WarpNamingMenu(player, menuNavigator, clickedBlock.location))
             }
