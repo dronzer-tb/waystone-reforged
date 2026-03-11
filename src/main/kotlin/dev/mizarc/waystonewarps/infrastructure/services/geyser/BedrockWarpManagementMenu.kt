@@ -5,6 +5,10 @@ import dev.mizarc.waystonewarps.application.services.ConfigService
 import dev.mizarc.waystonewarps.application.services.PlayerAttributeService
 import dev.mizarc.waystonewarps.application.results.UpdateWarpNameResult
 import dev.mizarc.waystonewarps.domain.warps.Warp
+import dev.mizarc.waystonewarps.infrastructure.services.teleportation.CostType
+import net.milkbowl.vault.economy.Economy
+import org.bukkit.Bukkit
+import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -153,20 +157,25 @@ class BedrockWarpManagementMenu(
             // Unsetting home costs money
             val baseCost = playerAttributeService.getTeleportCost(player.uniqueId)
             val multiplier = configService.getHomeUnsetCostMultiplier()
-            val unsetCost = (baseCost * multiplier).toInt()
+            val unsetCost = baseCost * multiplier
 
             BedrockSupport.sendModalForm(player,
                 title = "Unset Home",
-                content = "Unsetting your home will cost §e$unsetCost§r. Continue?",
+                content = "Unsetting your home will cost §e${unsetCost.toInt()}§r. Continue?",
                 button1 = "§aYes, Unset",
                 button2 = "§cCancel",
                 onButton1 = {
+                    if (!checkAndDeductCost(player, unsetCost)) {
+                        player.sendMessage("§cNot enough funds to unset home!")
+                        open()
+                        return@sendModalForm
+                    }
                     val result = toggleHome.execute(player.uniqueId, warp.id)
                     if (result.isSuccess) {
                         warp.isHome = false
                         player.sendMessage("§cHome waystone unset.")
                     } else {
-                        player.sendMessage("§cFailed to unset home. Insufficient funds?")
+                        player.sendMessage("§cFailed to unset home.")
                     }
                     open()
                 },
@@ -222,26 +231,32 @@ class BedrockWarpManagementMenu(
         if (!warp.isProtected) {
             val baseCost = playerAttributeService.getTeleportCost(player.uniqueId)
             val multiplier = configService.getProtectionModeCostMultiplier()
-            val protCost = (baseCost * multiplier).toInt()
+            val protCost = baseCost * multiplier
 
             BedrockSupport.sendModalForm(player,
                 title = "Enable Protection",
-                content = "Enabling protection will cost §e$protCost§r. Continue?",
+                content = "Enabling protection will cost §e${protCost.toInt()}§r. Continue?",
                 button1 = "§aYes, Enable",
                 button2 = "§cCancel",
                 onButton1 = {
+                    if (!checkAndDeductCost(player, protCost)) {
+                        player.sendMessage("§cNot enough funds to enable protection!")
+                        open()
+                        return@sendModalForm
+                    }
                     val result = toggleProtection.execute(player.uniqueId, warp.id)
                     if (result.isSuccess) {
                         warp.isProtected = true
                         player.sendMessage("§aProtection mode enabled!")
                     } else {
-                        player.sendMessage("§cFailed to enable protection. Insufficient funds?")
+                        player.sendMessage("§cFailed to enable protection.")
                     }
                     open()
                 },
                 onButton2 = { open() }
             )
         } else {
+            // Free to disable
             val result = toggleProtection.execute(player.uniqueId, warp.id)
             if (result.isSuccess) {
                 warp.isProtected = false
@@ -267,5 +282,49 @@ class BedrockWarpManagementMenu(
             },
             onButton2 = { open() }
         )
+    }
+
+    // --- Cost Deduction ---
+
+    private fun checkAndDeductCost(player: Player, cost: Double): Boolean {
+        if (cost <= 0) return true
+        return when (configService.getTeleportCostType()) {
+            CostType.MONEY -> {
+                val economy = Bukkit.getServicesManager().getRegistration(Economy::class.java)?.provider
+                if (economy?.has(player, cost) == true) {
+                    economy.withdrawPlayer(player, cost)
+                    true
+                } else false
+            }
+            CostType.XP -> {
+                if (player.totalExperience >= cost.toInt()) {
+                    player.giveExp(-cost.toInt())
+                    true
+                } else false
+            }
+            CostType.ITEM -> {
+                val material = try {
+                    Material.valueOf(configService.getTeleportCostItem())
+                } catch (_: IllegalArgumentException) {
+                    Material.ENDER_PEARL
+                }
+                val needed = cost.toInt()
+                var count = 0
+                for (item in player.inventory.contents.filterNotNull()) {
+                    if (item.type == material) count += item.amount
+                }
+                if (count < needed) return false
+                var remaining = needed
+                for (item in player.inventory.contents.filterNotNull()) {
+                    if (item.type == material) {
+                        val remove = minOf(item.amount, remaining)
+                        item.amount -= remove
+                        remaining -= remove
+                        if (remaining <= 0) break
+                    }
+                }
+                true
+            }
+        }
     }
 }
