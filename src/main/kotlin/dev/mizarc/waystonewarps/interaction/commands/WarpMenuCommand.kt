@@ -25,8 +25,7 @@ class WarpMenuCommand: BaseCommand(), KoinComponent {
         val plugin = JavaPlugin.getPlugin(WaystoneWarps::class.java)
         val geyserIntegration = plugin.getGeyserMenuIntegration()
         if (geyserIntegration?.isBedrockPlayer(player) == true) {
-            val api = geyserIntegration.getApi() ?: return
-            BedrockWarpMenu(player, api).open()
+            BedrockWarpMenu(player, plugin).open()
         } else {
             val menuNavigator = MenuNavigator(player)
             WarpMenu(player, menuNavigator, localizationProvider).open()

@@ -64,8 +64,8 @@ class WaystoneInteractListener(
 
     private fun openWarpMenuFor(player: Player, menuNavigator: MenuNavigator) {
         if (isBedrockPlayer(player)) {
-            val api = geyserMenuIntegration?.getApi() ?: return
-            BedrockWarpMenu(player, api).open()
+            val plugin = org.bukkit.plugin.java.JavaPlugin.getPlugin(dev.mizarc.waystonewarps.WaystoneWarps::class.java)
+            BedrockWarpMenu(player, plugin).open()
         } else {
             menuNavigator.openMenu(WarpMenu(player, menuNavigator, localizationProvider))
         }
@@ -73,8 +73,8 @@ class WaystoneInteractListener(
 
     private fun openManagementMenuFor(player: Player, menuNavigator: MenuNavigator, warp: dev.mizarc.waystonewarps.domain.warps.Warp) {
         if (isBedrockPlayer(player)) {
-            val api = geyserMenuIntegration?.getApi() ?: return
-            BedrockWarpManagementMenu(player, api, warp).open()
+            val plugin = org.bukkit.plugin.java.JavaPlugin.getPlugin(dev.mizarc.waystonewarps.WaystoneWarps::class.java)
+            BedrockWarpManagementMenu(player, plugin, warp).open()
         } else {
             menuNavigator.openMenu(WarpManagementMenu(player, menuNavigator, warp))
         }
@@ -215,8 +215,8 @@ class WaystoneInteractListener(
 
             // Open the naming menu (Bedrock custom form or Java anvil GUI)
             if (isBedrockPlayer(player)) {
-                val api = geyserMenuIntegration?.getApi() ?: return
-                BedrockWarpNamingMenu(player, api, clickedBlock.location).open()
+                val plugin = org.bukkit.plugin.java.JavaPlugin.getPlugin(dev.mizarc.waystonewarps.WaystoneWarps::class.java)
+                BedrockWarpNamingMenu(player, plugin, clickedBlock.location).open()
             } else {
                 menuNavigator.openMenu(WarpNamingMenu(player, menuNavigator, clickedBlock.location))
             }

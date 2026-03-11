@@ -1,6 +1,5 @@
 package dev.mizarc.waystonewarps.infrastructure.services.geyser
 
-import com.geysermenu.companion.api.GeyserMenuAPI
 import dev.mizarc.waystonewarps.application.actions.discovery.GetPlayerWarpAccess
 import dev.mizarc.waystonewarps.application.actions.teleport.TeleportPlayer
 import dev.mizarc.waystonewarps.application.actions.whitelist.GetWhitelistedPlayers
@@ -9,16 +8,20 @@ import dev.mizarc.waystonewarps.interaction.localization.LocalizationKeys
 import dev.mizarc.waystonewarps.interaction.localization.LocalizationProvider
 import dev.mizarc.waystonewarps.interaction.messaging.PrimaryColourPalette
 import net.kyori.adventure.text.Component
+import org.bukkit.Bukkit
 import org.bukkit.entity.Player
+import org.bukkit.plugin.java.JavaPlugin
+import org.geysermc.cumulus.form.SimpleForm
+import org.geysermc.floodgate.api.FloodgateApi
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
 /**
- * Form-based warp list menu for Bedrock players using GeyserMenu API.
+ * Form-based warp list menu for Bedrock players using Floodgate + Cumulus forms.
  */
 class BedrockWarpMenu(
     private val player: Player,
-    private val api: GeyserMenuAPI
+    private val plugin: JavaPlugin
 ) : KoinComponent {
     private val getPlayerWarpAccess: GetPlayerWarpAccess by inject()
     private val teleportPlayer: TeleportPlayer by inject()
@@ -29,28 +32,30 @@ class BedrockWarpMenu(
         val warps = getPlayerWarpAccess.execute(player.uniqueId).sortedBy { it.name }
 
         if (warps.isEmpty()) {
-            api.createSimpleMenu("Waystone Warps", player.uniqueId)
+            val form = SimpleForm.builder()
+                .title("Waystone Warps")
                 .content("You haven't discovered any waystone warps yet.")
                 .button("Close")
-                .send { /* closed */ }
+                .build()
+            FloodgateApi.getInstance().sendForm(player.uniqueId, form)
             return
         }
 
-        val builder = api.createSimpleMenu("Waystone Warps", player.uniqueId)
+        val builder = SimpleForm.builder()
+            .title("Waystone Warps")
             .content("Select a waystone to teleport to:")
 
         for (warp in warps) {
             val isLocked = warp.isLocked
                 && !getWhitelistedPlayers.execute(warp.id).contains(player.uniqueId)
                 && player.uniqueId != warp.playerId
-            val label = if (isLocked) "🔒 ${warp.name}" else warp.name
+            val label = if (isLocked) "§c🔒 ${warp.name}" else warp.name
             builder.button(label)
         }
 
-        builder.send { response ->
-            if (response.wasClosed()) return@send
-            val index = response.buttonId
-            if (index < 0 || index >= warps.size) return@send
+        builder.validResultHandler { response ->
+            val index = response.clickedButtonId()
+            if (index < 0 || index >= warps.size) return@validResultHandler
 
             val selectedWarp = warps[index]
             val isLocked = selectedWarp.isLocked
@@ -58,15 +63,21 @@ class BedrockWarpMenu(
                 && player.uniqueId != selectedWarp.playerId
 
             if (isLocked) {
-                player.sendActionBar(
-                    Component.text(localizationProvider.get(player.uniqueId, LocalizationKeys.FEEDBACK_TELEPORT_LOCKED))
-                        .color(PrimaryColourPalette.CANCELLED.color)
-                )
-                return@send
+                Bukkit.getScheduler().runTask(plugin, Runnable {
+                    player.sendActionBar(
+                        Component.text(localizationProvider.get(player.uniqueId, LocalizationKeys.FEEDBACK_TELEPORT_LOCKED))
+                            .color(PrimaryColourPalette.CANCELLED.color)
+                    )
+                })
+                return@validResultHandler
             }
 
-            teleportToWarp(selectedWarp)
+            Bukkit.getScheduler().runTask(plugin, Runnable {
+                teleportToWarp(selectedWarp)
+            })
         }
+
+        FloodgateApi.getInstance().sendForm(player.uniqueId, builder.build())
     }
 
     private fun teleportToWarp(warp: Warp) {
