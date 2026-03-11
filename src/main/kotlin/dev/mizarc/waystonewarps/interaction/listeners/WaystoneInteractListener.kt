@@ -139,6 +139,7 @@ class WaystoneInteractListener(
                 } else {
                     openManagementMenuFor(player, menuNavigator, it)
                 }
+                return
 
             // Non-owner path.
             } else {
@@ -183,6 +184,7 @@ class WaystoneInteractListener(
                     }
                 }
             }
+            return
         }
 
         // Check if valid warp base to create warp
