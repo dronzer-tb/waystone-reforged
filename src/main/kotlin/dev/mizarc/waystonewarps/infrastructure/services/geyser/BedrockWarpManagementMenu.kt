@@ -53,7 +53,7 @@ class BedrockWarpManagementMenu(
         buttons.add(FormButton("§l§8Rename", imagePath = "textures/items/name_tag"))
 
         // 3: Skins
-        buttons.add(FormButton("§l§8Skins", imageUrl = "https://static.wikia.nocookie.net/minecraft_gamepedia/images/3/32/Lodestone_JE1_BE1.png/revision/latest?cb=20200325183527"))
+        buttons.add(FormButton("§l§8Skins", imagePath = "textures/blocks/lodestone_top"))
 
         // 4: Home
         if (warp.isHome) {
@@ -67,9 +67,9 @@ class BedrockWarpManagementMenu(
 
         // 6: Protection
         if (warp.isProtected) {
-            buttons.add(FormButton("§l§8Protection §a(On)", imageUrl = "https://static.wikia.nocookie.net/minecraft_gamepedia/images/9/99/Obsidian_JE3_BE2.png/revision/latest?cb=20200124042057"))
+            buttons.add(FormButton("§l§8Protection §a(On)", imagePath = "textures/blocks/obsidian"))
         } else {
-            buttons.add(FormButton("§l§8Protection §8(Off)", imageUrl = "https://static.wikia.nocookie.net/minecraft_gamepedia/images/7/7f/Crying_Obsidian_JE1_BE1.png/revision/latest?cb=20200302214526"))
+            buttons.add(FormButton("§l§8Protection §8(Off)", imagePath = "textures/blocks/crying_obsidian"))
         }
 
         // 7: Back
@@ -154,7 +154,7 @@ class BedrockWarpManagementMenu(
         )
         // Owner cannot be revoked
         if (!isOwner) {
-            buttons.add(FormButton("§l§cRevoke Discovery", imageUrl = "https://mcdf.wiki.gg/images/Barrier.png?ff8ff1"))
+            buttons.add(FormButton("§l§cRevoke Discovery", imagePath = "textures/blocks/barrier"))
         }
         buttons.add(FormButton("§l§8Back", imagePath = "textures/items/nether_star"))
 

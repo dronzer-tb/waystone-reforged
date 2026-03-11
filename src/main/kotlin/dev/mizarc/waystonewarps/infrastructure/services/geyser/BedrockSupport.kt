@@ -8,6 +8,7 @@ import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.plugin.java.JavaPlugin
+import org.bukkit.scheduler.BukkitTask
 import java.lang.reflect.Method
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -55,6 +56,14 @@ object BedrockSupport : Listener {
     // Cache for Bedrock player status
     private val bedrockPlayerCache = ConcurrentHashMap<UUID, Boolean>()
 
+    // Keepalive task to prevent TCP connection timeout
+    private var keepaliveTask: BukkitTask? = null
+    private var isConnectedMethod: Method? = null
+
+    // Retry constants
+    private const val MAX_SEND_RETRIES = 3
+    private const val RETRY_DELAY_TICKS = 20L // 1 second
+
     // ================================================================
     // Cached GeyserMenu API references
     // ================================================================
@@ -98,6 +107,9 @@ object BedrockSupport : Listener {
                 createCustomMenuMethod = apiClass!!.getMethod("createCustomMenu", String::class.java, UUID::class.java)
                 customBuilderType = createCustomMenuMethod!!.returnType
 
+                // Cache isConnected() for health checks
+                isConnectedMethod = apiClass!!.getMethod("isConnected")
+
                 logger.info("[Bedrock] GeyserMenu API initialized")
                 logger.info("[Bedrock]   SimpleBuilder: ${simpleBuilderType?.name}")
                 logger.info("[Bedrock]   ModalBuilder:  ${modalBuilderType?.name}")
@@ -124,6 +136,9 @@ object BedrockSupport : Listener {
 
             // Pre-cache all online players
             plugin.server.onlinePlayers.forEach { cachePlayerStatus(it) }
+
+            // Start keepalive task — pings the API every 60 seconds to prevent TCP idle timeout
+            startKeepalive()
         } else {
             logger.info("[Bedrock] Bedrock forms disabled - GeyserMenu Companion plugin is required")
         }
@@ -133,7 +148,64 @@ object BedrockSupport : Listener {
     }
 
     fun shutdown() {
+        keepaliveTask?.cancel()
+        keepaliveTask = null
         bedrockPlayerCache.clear()
+    }
+
+    // ================================================================
+    // Connection health & keepalive
+    // ================================================================
+
+    /**
+     * Check if the GeyserMenu API TCP connection is currently authenticated.
+     */
+    private fun isApiConnected(): Boolean {
+        if (!geyserMenuAvailable || geyserMenuApi == null || isConnectedMethod == null) return false
+        return try {
+            isConnectedMethod!!.invoke(geyserMenuApi) as? Boolean ?: false
+        } catch (_: Exception) { false }
+    }
+
+    /**
+     * Re-fetch the GeyserMenu API singleton. Handles cases where the
+     * companion plugin was reloaded and the old instance is stale.
+     */
+    private fun refreshApi(): Boolean {
+        return try {
+            val freshApi = apiClass!!.getMethod("getInstance").invoke(null)
+            if (freshApi != null && freshApi !== geyserMenuApi) {
+                geyserMenuApi = freshApi
+                logger.info("[Bedrock] Refreshed GeyserMenu API instance")
+            }
+            val connected = isConnectedMethod!!.invoke(geyserMenuApi) as? Boolean ?: false
+            if (!connected) {
+                logger.warning("[Bedrock] GeyserMenu API not connected after refresh")
+            }
+            connected
+        } catch (e: Exception) {
+            logger.warning("[Bedrock] Failed to refresh API: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Periodic keepalive — calls isConnected() every 60 seconds.
+     * This triggers internal activity on the GeyserMenu TCP connection,
+     * preventing idle timeout from firewalls/NAT.
+     * If disconnected, re-fetches the API singleton.
+     */
+    private fun startKeepalive() {
+        keepaliveTask?.cancel()
+        // 1200 ticks = 60 seconds
+        keepaliveTask = plugin.server.scheduler.runTaskTimer(plugin, Runnable {
+            if (!geyserMenuAvailable || geyserMenuApi == null) return@Runnable
+            val connected = isApiConnected()
+            if (!connected) {
+                logger.warning("[Bedrock] Keepalive: API disconnected — attempting refresh")
+                refreshApi()
+            }
+        }, 1200L, 1200L)
     }
 
     // ================================================================
@@ -217,7 +289,18 @@ object BedrockSupport : Listener {
     // Form API
     // All methods called through the PUBLIC interface types to avoid
     // IllegalAccessException on private implementation classes.
+    // Includes connection check + retry on disconnect.
     // ================================================================
+
+    /**
+     * Ensures the API is connected before sending a form.
+     * Returns true if connected (possibly after refresh), false if unrecoverable.
+     */
+    private fun ensureConnected(): Boolean {
+        if (isApiConnected()) return true
+        logger.warning("[Bedrock] API disconnected — refreshing before send")
+        return refreshApi()
+    }
 
     /**
      * Send a simple form (button list) to a Bedrock player.
@@ -235,6 +318,30 @@ object BedrockSupport : Listener {
             return false
         }
 
+        if (!ensureConnected()) {
+            // Schedule a retry after a short delay
+            plugin.server.scheduler.runTaskLater(plugin, Runnable {
+                if (ensureConnected()) {
+                    doSendSimpleForm(player, title, content, buttons, onButtonClicked, onClosed)
+                } else {
+                    logger.warning("[Bedrock] API still disconnected after retry — form '${title}' not sent")
+                    player.sendMessage("§c[Waystone] Bedrock menu temporarily unavailable. Please try again.")
+                }
+            }, RETRY_DELAY_TICKS)
+            return false
+        }
+
+        return doSendSimpleForm(player, title, content, buttons, onButtonClicked, onClosed)
+    }
+
+    private fun doSendSimpleForm(
+        player: Player,
+        title: String,
+        content: String,
+        buttons: List<FormButton>,
+        onButtonClicked: (Int) -> Unit,
+        onClosed: () -> Unit
+    ): Boolean {
         try {
             val builder = createSimpleMenuMethod!!.invoke(geyserMenuApi, title, player.uniqueId)
             val bt = simpleBuilderType!!
@@ -303,6 +410,31 @@ object BedrockSupport : Listener {
             return false
         }
 
+        if (!ensureConnected()) {
+            plugin.server.scheduler.runTaskLater(plugin, Runnable {
+                if (ensureConnected()) {
+                    doSendModalForm(player, title, content, button1, button2, onButton1, onButton2, onClosed)
+                } else {
+                    logger.warning("[Bedrock] API still disconnected after retry — modal '${title}' not sent")
+                    player.sendMessage("§c[Waystone] Bedrock menu temporarily unavailable. Please try again.")
+                }
+            }, RETRY_DELAY_TICKS)
+            return false
+        }
+
+        return doSendModalForm(player, title, content, button1, button2, onButton1, onButton2, onClosed)
+    }
+
+    private fun doSendModalForm(
+        player: Player,
+        title: String,
+        content: String,
+        button1: String,
+        button2: String,
+        onButton1: () -> Unit,
+        onButton2: () -> Unit,
+        onClosed: () -> Unit
+    ): Boolean {
         try {
             val builder = createModalMenuMethod!!.invoke(geyserMenuApi, title, player.uniqueId)
             val bt = modalBuilderType!!
@@ -356,6 +488,28 @@ object BedrockSupport : Listener {
             return false
         }
 
+        if (!ensureConnected()) {
+            plugin.server.scheduler.runTaskLater(plugin, Runnable {
+                if (ensureConnected()) {
+                    doSendCustomForm(player, title, elements, onSubmit, onClosed)
+                } else {
+                    logger.warning("[Bedrock] API still disconnected after retry — custom form '${title}' not sent")
+                    player.sendMessage("§c[Waystone] Bedrock menu temporarily unavailable. Please try again.")
+                }
+            }, RETRY_DELAY_TICKS)
+            return false
+        }
+
+        return doSendCustomForm(player, title, elements, onSubmit, onClosed)
+    }
+
+    private fun doSendCustomForm(
+        player: Player,
+        title: String,
+        elements: List<FormElement>,
+        onSubmit: (Map<String, String>) -> Unit,
+        onClosed: () -> Unit
+    ): Boolean {
         try {
             val builder = createCustomMenuMethod!!.invoke(geyserMenuApi, title, player.uniqueId)
             val bt = customBuilderType!!
