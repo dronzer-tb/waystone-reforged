@@ -1,9 +1,13 @@
 package dev.mizarc.waystonewarps.infrastructure.services.geyser
 
+import dev.mizarc.waystonewarps.application.actions.discovery.GetWarpPlayerAccess
+import dev.mizarc.waystonewarps.application.actions.discovery.RevokeDiscovery
 import dev.mizarc.waystonewarps.application.actions.management.*
+import dev.mizarc.waystonewarps.application.actions.whitelist.GetWhitelistedPlayers
+import dev.mizarc.waystonewarps.application.actions.whitelist.ToggleWhitelist
+import dev.mizarc.waystonewarps.application.results.UpdateWarpNameResult
 import dev.mizarc.waystonewarps.application.services.ConfigService
 import dev.mizarc.waystonewarps.application.services.PlayerAttributeService
-import dev.mizarc.waystonewarps.application.results.UpdateWarpNameResult
 import dev.mizarc.waystonewarps.domain.warps.Warp
 import dev.mizarc.waystonewarps.infrastructure.services.teleportation.CostType
 import net.milkbowl.vault.economy.Economy
@@ -14,8 +18,8 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
 /**
- * Bedrock form-based waystone editor menu matching the Excalidraw design.
- * Layout: Private, Player Management, Home, Rename, Skins, Protection Mode, Move
+ * Bedrock form-based waystone editor menu.
+ * Buttons use built-in Bedrock texture paths for icons.
  */
 class BedrockWarpManagementMenu(
     private val player: Player,
@@ -25,64 +29,69 @@ class BedrockWarpManagementMenu(
     private val updateWarpName: UpdateWarpName by inject()
     private val toggleHome: ToggleHome by inject()
     private val toggleProtection: ToggleProtection by inject()
+    private val getWarpPlayerAccess: GetWarpPlayerAccess by inject()
+    private val getWhitelistedPlayers: GetWhitelistedPlayers by inject()
+    private val toggleWhitelist: ToggleWhitelist by inject()
+    private val revokeDiscovery: RevokeDiscovery by inject()
     private val configService: ConfigService by inject()
     private val playerAttributeService: PlayerAttributeService by inject()
 
     fun open() {
         val buttons = mutableListOf<FormButton>()
 
-        // Private / Public toggle
-        val privacyLabel = if (warp.isLocked) "§c\uD83D\uDD12 Private" else "§a\uD83D\uDD13 Public"
-        buttons.add(FormButton(privacyLabel))
+        // 0: Public / Private
+        if (warp.isLocked) {
+            buttons.add(FormButton("§l§0Private", imagePath = "textures/blocks/redstone_torch_on"))
+        } else {
+            buttons.add(FormButton("§l§0Public", imagePath = "textures/blocks/lever"))
+        }
 
-        // Player Management
-        buttons.add(FormButton("§e\uD83D\uDC65 Player Management"))
+        // 1: Discovered Players
+        buttons.add(FormButton("§l§0Discovered Players", imagePath = "textures/ui/icon_steve"))
 
-        // Home toggle
-        val homeLabel = if (warp.isHome) "§c\uD83D\uDECF Home (Unset)" else "§a\uD83D\uDECF Set Home"
-        buttons.add(FormButton(homeLabel))
+        // 2: Rename
+        buttons.add(FormButton("§l§0Rename", imagePath = "textures/items/name_tag"))
 
-        // Rename
-        buttons.add(FormButton("§b✏ Rename"))
+        // 3: Skins
+        buttons.add(FormButton("§l§0Skins", imagePath = "textures/blocks/lodestone_top"))
 
-        // Skins
-        buttons.add(FormButton("§d\uD83C\uDFA8 Skins"))
+        // 4: Home
+        if (warp.isHome) {
+            buttons.add(FormButton("§l§0Home §c(On)", imagePath = "textures/items/bed_red"))
+        } else {
+            buttons.add(FormButton("§l§0Home §7(Off)", imagePath = "textures/items/bed_white"))
+        }
 
-        // Protection Mode toggle
-        val protLabel = if (warp.isProtected)
-            "§c\uD83D\uDEE1 Protection (Disable)"
-        else
-            "§a\uD83D\uDEE1 Protection (Enable)"
-        buttons.add(FormButton(protLabel))
+        // 5: Move
+        buttons.add(FormButton("§l§0Move", imagePath = "textures/blocks/piston_side"))
 
-        // Move
-        buttons.add(FormButton("§6↕ Move"))
+        // 6: Protection
+        if (warp.isProtected) {
+            buttons.add(FormButton("§l§0Protection §a(On)", imagePath = "textures/blocks/obsidian"))
+        } else {
+            buttons.add(FormButton("§l§0Protection §7(Off)", imagePath = "textures/blocks/crying_obsidian"))
+        }
+
+        // 7: Back
+        buttons.add(FormButton("§l§0Back", imagePath = "textures/items/nether_star"))
 
         BedrockSupport.sendSimpleForm(player,
-            title = "§1Waystone Editor - ${warp.name}",
-            content = buildStatusContent(),
+            title = "§l§0Waystone Editor - ${warp.name}",
+            content = "",
             buttons = buttons,
             onButtonClicked = { index ->
                 when (index) {
                     0 -> handleTogglePrivacy()
-                    1 -> openPlayerManagementForm()
-                    2 -> handleToggleHome()
-                    3 -> openRenameForm()
-                    4 -> player.sendMessage("§eSkins are only available on Java Edition.")
-                    5 -> handleToggleProtection()
-                    6 -> handleMove()
+                    1 -> openDiscoveredPlayersMenu()
+                    2 -> openRenameForm()
+                    3 -> player.sendMessage("§eSkins are only available on Java Edition.")
+                    4 -> handleToggleHome()
+                    5 -> handleMove()
+                    6 -> handleToggleProtection()
+                    7 -> { /* back / close */ }
                 }
             }
         )
-    }
-
-    private fun buildStatusContent(): String {
-        val sb = StringBuilder()
-        sb.appendLine("§7Status:")
-        sb.appendLine(if (warp.isLocked) "  §c🔒 Private" else "  §a🔓 Public")
-        sb.appendLine(if (warp.isHome) "  §a🏠 Home" else "  §7🏠 Not Home")
-        sb.appendLine(if (warp.isProtected) "  §a🛡 Protected" else "  §7🛡 Not Protected")
-        return sb.toString()
     }
 
     // --- Privacy ---
@@ -95,57 +104,120 @@ class BedrockWarpManagementMenu(
         open()
     }
 
-    // --- Player Management ---
+    // --- Discovered Players ---
 
-    private fun openPlayerManagementForm() {
+    private fun openDiscoveredPlayersMenu() {
+        val discoveredPlayerIds = getWarpPlayerAccess.execute(warp.id)
+        val whitelistedIds = getWhitelistedPlayers.execute(warp.id).toSet()
+
+        if (discoveredPlayerIds.isEmpty()) {
+            BedrockSupport.sendSimpleForm(player,
+                title = "§l§0Discovered Players",
+                content = "No players have discovered this waystone yet.",
+                buttons = listOf(FormButton("§l§0Back", imagePath = "textures/items/nether_star")),
+                onButtonClicked = { open() }
+            )
+            return
+        }
+
+        val buttons = discoveredPlayerIds.map { uuid ->
+            val name = Bukkit.getOfflinePlayer(uuid).name ?: uuid.toString().take(8)
+            val whitelistTag = if (whitelistedIds.contains(uuid)) " §a✔" else ""
+            FormButton("§l§0$name$whitelistTag", imagePath = "textures/ui/icon_steve")
+        }.toMutableList()
+        buttons.add(FormButton("§l§0Back", imagePath = "textures/items/nether_star"))
+
         BedrockSupport.sendSimpleForm(player,
-            title = "Player Management - ${warp.name}",
-            content = "Manage who can access this waystone.",
-            buttons = listOf(FormButton("§aAdd Player"), FormButton("§cRemove Player"), FormButton("§7Back")),
+            title = "§l§0Discovered Players - ${warp.name}",
+            content = "Select a player to manage. §a✔ = whitelisted",
+            buttons = buttons,
+            onButtonClicked = { index ->
+                if (index >= discoveredPlayerIds.size) {
+                    open()
+                    return@sendSimpleForm
+                }
+                openPlayerActionMenu(discoveredPlayerIds[index])
+            }
+        )
+    }
+
+    private fun openPlayerActionMenu(targetId: java.util.UUID) {
+        val targetName = Bukkit.getOfflinePlayer(targetId).name ?: targetId.toString().take(8)
+        val isWhitelisted = getWhitelistedPlayers.execute(warp.id).contains(targetId)
+
+        val whitelistLabel = if (isWhitelisted) "§l§0Remove from Whitelist" else "§l§0Add to Whitelist"
+
+        val buttons = listOf(
+            FormButton(whitelistLabel, imagePath = "textures/items/lantern"),
+            FormButton("§l§cRevoke Discovery", imagePath = "textures/items/barrier"),
+            FormButton("§l§0Back", imagePath = "textures/items/nether_star")
+        )
+
+        BedrockSupport.sendSimpleForm(player,
+            title = "§l§0Player: $targetName",
+            content = if (isWhitelisted) "§aCurrently whitelisted" else "§7Not whitelisted",
+            buttons = buttons,
             onButtonClicked = { index ->
                 when (index) {
-                    0 -> openAddPlayerForm()
-                    1 -> openRemovePlayerForm()
-                    2 -> open()
+                    0 -> {
+                        val result = toggleWhitelist.execute(player.uniqueId, warp.id, targetId)
+                        if (result.isSuccess) {
+                            val added = result.getOrNull() == true
+                            player.sendMessage(if (added) "§a$targetName added to whitelist." else "§c$targetName removed from whitelist.")
+                        } else {
+                            player.sendMessage("§cFailed to toggle whitelist.")
+                        }
+                        openDiscoveredPlayersMenu()
+                    }
+                    1 -> {
+                        // Confirm revoke
+                        BedrockSupport.sendModalForm(player,
+                            title = "Revoke Discovery",
+                            content = "Remove §e$targetName§r's discovery of this waystone?",
+                            button1 = "§cYes, Revoke",
+                            button2 = "§aCancel",
+                            onButton1 = {
+                                revokeDiscovery.execute(targetId, warp.id)
+                                player.sendMessage("§c$targetName's discovery revoked.")
+                                openDiscoveredPlayersMenu()
+                            },
+                            onButton2 = { openPlayerActionMenu(targetId) }
+                        )
+                    }
+                    2 -> openDiscoveredPlayersMenu()
                 }
             }
         )
     }
 
-    private fun openAddPlayerForm() {
-        BedrockSupport.sendCustomForm(player,
-            title = "Add Player - ${warp.name}",
-            elements = listOf(
-                FormElement.Input("player", "Player Name", "Enter player name", "")
-            ),
-            onSubmit = { values ->
-                val name = values["player"] ?: ""
-                if (name.isBlank()) {
-                    player.sendMessage("§cPlayer name cannot be blank.")
-                } else {
-                    player.performCommand("waystonewarps whitelist add ${warp.id} $name")
-                    player.sendMessage("§aAdded §e$name §ato the whitelist.")
-                }
-                openPlayerManagementForm()
-            }
-        )
-    }
+    // --- Rename ---
 
-    private fun openRemovePlayerForm() {
+    private fun openRenameForm() {
         BedrockSupport.sendCustomForm(player,
-            title = "Remove Player - ${warp.name}",
+            title = "§l§0Rename Waystone",
             elements = listOf(
-                FormElement.Input("player", "Player Name", "Enter player name", "")
+                FormElement.Input("name", "New Name", "Enter new name", warp.name)
             ),
             onSubmit = { values ->
-                val name = values["player"] ?: ""
+                val name = values["name"] ?: ""
                 if (name.isBlank()) {
-                    player.sendMessage("§cPlayer name cannot be blank.")
-                } else {
-                    player.performCommand("waystonewarps whitelist remove ${warp.id} $name")
-                    player.sendMessage("§cRemoved §e$name §cfrom the whitelist.")
+                    player.sendMessage("§cName cannot be blank.")
+                    openRenameForm()
+                    return@sendCustomForm
                 }
-                openPlayerManagementForm()
+                val result = updateWarpName.execute(warp.id, player.uniqueId, name)
+                when (result) {
+                    UpdateWarpNameResult.SUCCESS -> {
+                        warp.name = name
+                        player.sendMessage("§aWaystone renamed to §e$name§a.")
+                    }
+                    UpdateWarpNameResult.NAME_ALREADY_TAKEN ->
+                        player.sendMessage("§cA waystone with that name already exists.")
+                    UpdateWarpNameResult.NAME_BLANK ->
+                        player.sendMessage("§cName cannot be blank.")
+                    else -> player.sendMessage("§cRename failed.")
+                }
+                open()
             }
         )
     }
@@ -154,13 +226,12 @@ class BedrockWarpManagementMenu(
 
     private fun handleToggleHome() {
         if (warp.isHome) {
-            // Unsetting home costs money
             val baseCost = playerAttributeService.getTeleportCost(player.uniqueId)
             val multiplier = configService.getHomeUnsetCostMultiplier()
             val unsetCost = baseCost * multiplier
 
             BedrockSupport.sendModalForm(player,
-                title = "Unset Home",
+                title = "§l§0Unset Home",
                 content = "Unsetting your home will cost §e${unsetCost.toInt()}§r. Continue?",
                 button1 = "§aYes, Unset",
                 button2 = "§cCancel",
@@ -193,35 +264,19 @@ class BedrockWarpManagementMenu(
         }
     }
 
-    // --- Rename ---
+    // --- Move ---
 
-    private fun openRenameForm() {
-        BedrockSupport.sendCustomForm(player,
-            title = "Rename Waystone",
-            elements = listOf(
-                FormElement.Input("name", "New Name", "Enter new name", warp.name)
-            ),
-            onSubmit = { values ->
-                val name = values["name"] ?: ""
-                if (name.isBlank()) {
-                    player.sendMessage("§cName cannot be blank.")
-                    openRenameForm()
-                    return@sendCustomForm
-                }
-                val result = updateWarpName.execute(warp.id, player.uniqueId, name)
-                when (result) {
-                    UpdateWarpNameResult.SUCCESS -> {
-                        warp.name = name
-                        player.sendMessage("§aWaystone renamed to §e$name§a.")
-                    }
-                    UpdateWarpNameResult.NAME_ALREADY_TAKEN ->
-                        player.sendMessage("§cA waystone with that name already exists.")
-                    UpdateWarpNameResult.NAME_BLANK ->
-                        player.sendMessage("§cName cannot be blank.")
-                    else -> player.sendMessage("§cRename failed.")
-                }
-                open()
-            }
+    private fun handleMove() {
+        BedrockSupport.sendModalForm(player,
+            title = "§l§0Move Waystone",
+            content = "Move this waystone to your current location?",
+            button1 = "§aYes, Move",
+            button2 = "§cCancel",
+            onButton1 = {
+                player.performCommand("waystonewarps move ${warp.id}")
+                player.sendMessage("§aWaystone moved to your current location.")
+            },
+            onButton2 = { open() }
         )
     }
 
@@ -234,7 +289,7 @@ class BedrockWarpManagementMenu(
             val protCost = baseCost * multiplier
 
             BedrockSupport.sendModalForm(player,
-                title = "Enable Protection",
+                title = "§l§0Enable Protection",
                 content = "Enabling protection will cost §e${protCost.toInt()}§r. Continue?",
                 button1 = "§aYes, Enable",
                 button2 = "§cCancel",
@@ -256,7 +311,6 @@ class BedrockWarpManagementMenu(
                 onButton2 = { open() }
             )
         } else {
-            // Free to disable
             val result = toggleProtection.execute(player.uniqueId, warp.id)
             if (result.isSuccess) {
                 warp.isProtected = false
@@ -266,22 +320,6 @@ class BedrockWarpManagementMenu(
             }
             open()
         }
-    }
-
-    // --- Move ---
-
-    private fun handleMove() {
-        BedrockSupport.sendModalForm(player,
-            title = "Move Waystone",
-            content = "Move this waystone to your current location?",
-            button1 = "§aYes, Move",
-            button2 = "§cCancel",
-            onButton1 = {
-                player.performCommand("waystonewarps move ${warp.id}")
-                player.sendMessage("§aWaystone moved to your current location.")
-            },
-            onButton2 = { open() }
-        )
     }
 
     // --- Cost Deduction ---
