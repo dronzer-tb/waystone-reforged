@@ -98,3 +98,7 @@ permissions:
   waystonewarps.home:
     description: Can set a waystone as home and teleport to it
     default: true
+
+  waystonewarps.limit.*:
+    description: Sets the maximum number of waystones a player can create (e.g. waystonewarps.limit.5)
+    default: false

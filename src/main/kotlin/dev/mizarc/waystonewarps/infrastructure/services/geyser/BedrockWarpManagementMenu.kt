@@ -97,10 +97,14 @@ class BedrockWarpManagementMenu(
     // --- Privacy ---
 
     private fun handleTogglePrivacy() {
-        toggleLock.execute(player.uniqueId, warp.id)
-        warp.isLocked = !warp.isLocked
-        val msg = if (warp.isLocked) "§cWaystone set to private." else "§aWaystone set to public."
-        player.sendMessage(msg)
+        val result = toggleLock.execute(player.uniqueId, warp.id)
+        if (result.isSuccess) {
+            // warp is the cached instance — ToggleLock already mutated it
+            val msg = if (warp.isLocked) "§cWaystone set to private." else "§aWaystone set to public."
+            player.sendMessage(msg)
+        } else {
+            player.sendMessage("§cFailed to toggle privacy.")
+        }
         open()
     }
 
@@ -266,7 +270,7 @@ class BedrockWarpManagementMenu(
                     }
                     val result = toggleHome.execute(player.uniqueId, warp.id)
                     if (result.isSuccess) {
-                        warp.isHome = false
+                        // warp is cached — ToggleHome already mutated it
                         player.sendMessage("§cHome waystone unset.")
                     } else {
                         player.sendMessage("§cFailed to unset home.")
@@ -278,7 +282,7 @@ class BedrockWarpManagementMenu(
         } else {
             val result = toggleHome.execute(player.uniqueId, warp.id)
             if (result.isSuccess) {
-                warp.isHome = true
+                // warp is cached — ToggleHome already mutated it
                 player.sendMessage("§aThis waystone is now your home!")
             } else {
                 player.sendMessage("§cFailed to set home.")
@@ -324,7 +328,7 @@ class BedrockWarpManagementMenu(
                     }
                     val result = toggleProtection.execute(player.uniqueId, warp.id)
                     if (result.isSuccess) {
-                        warp.isProtected = true
+                        // warp is cached — ToggleProtection already mutated it
                         player.sendMessage("§aProtection mode enabled!")
                     } else {
                         player.sendMessage("§cFailed to enable protection.")
@@ -336,7 +340,7 @@ class BedrockWarpManagementMenu(
         } else {
             val result = toggleProtection.execute(player.uniqueId, warp.id)
             if (result.isSuccess) {
-                warp.isProtected = false
+                // warp is cached — ToggleProtection already mutated it
                 player.sendMessage("§cProtection mode disabled.")
             } else {
                 player.sendMessage("§cFailed to disable protection.")
