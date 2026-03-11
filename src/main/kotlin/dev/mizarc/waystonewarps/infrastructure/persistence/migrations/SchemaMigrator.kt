@@ -13,7 +13,8 @@ class SchemaMigrator(
         val latestVersion = migrations.maxOfOrNull { it.toVersion } ?: 0
 
         if (currentVersion > latestVersion) {
-            throw IllegalStateException("Database schema version $currentVersion is newer than supported version $latestVersion")
+            // Database was previously used with a newer plugin version; skip migrations.
+            return
         }
 
         val migrationByFromVersion = migrations.associateBy { it.fromVersion }

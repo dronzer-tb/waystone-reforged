@@ -33,6 +33,7 @@ import org.bukkit.event.Listener
 import org.bukkit.event.block.Action
 import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.player.PlayerInteractEvent
+import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.inventory.ItemStack
 import org.koin.core.component.KoinComponent
@@ -75,6 +76,11 @@ class WaystoneInteractListener(
         } else {
             menuNavigator.openMenu(WarpManagementMenu(player, menuNavigator, warp))
         }
+    }
+
+    @EventHandler
+    fun onPlayerQuit(event: PlayerQuitEvent) {
+        bedrockInteractCooldowns.remove(event.player.uniqueId)
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
@@ -159,15 +165,25 @@ class WaystoneInteractListener(
                         .append(Component.text(warp.name).color(AccentColourPalette.SUCCESS.color))
                         .append(Component.text( " has been discovered!").color(PrimaryColourPalette.SUCCESS.color)))
 
-                    // Play discovery effects only once per player-warp (guard against duplicate events)
+                    // Play discovery effects only once per player-warp
                     val discoveryKey = Pair(player.uniqueId, it.id)
                     if (!recentDiscoveryEffects.contains(discoveryKey)) {
                         recentDiscoveryEffects.add(discoveryKey)
-                        // Skip particles and sound entirely for Bedrock (TOTEM_OF_UNDYING has built-in audio on Bedrock)
+
+                        // Use player-specific methods to avoid sending TOTEM_OF_UNDYING to
+                        // nearby Bedrock clients (which loop the totem animation/sound).
+                        // Also skip entirely for Bedrock discoverers.
                         if (!isBedrockPlayer(player)) {
-                            clickedBlock.world.spawnParticle(Particle.TOTEM_OF_UNDYING, particleLocation, 20)
-                            clickedBlock.world.playSound(particleLocation, Sound.BLOCK_AMETHYST_BLOCK_HIT, SoundCategory.BLOCKS, 1.0f, 1.0f)
+                            player.spawnParticle(Particle.TOTEM_OF_UNDYING, particleLocation, 20)
+                            player.playSound(particleLocation, Sound.BLOCK_AMETHYST_BLOCK_HIT, SoundCategory.BLOCKS, 1.0f, 1.0f)
                         }
+
+                        // Clean up the guard entry after 10 seconds
+                        Bukkit.getScheduler().runTaskLater(
+                            Bukkit.getPluginManager().getPlugin("WaystoneWarps")!!,
+                            Runnable { recentDiscoveryEffects.remove(discoveryKey) },
+                            200L
+                        )
                     }
                 } else {
                     // Already discovered - open warp menu if allowed
