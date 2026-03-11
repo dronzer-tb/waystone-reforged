@@ -8,6 +8,7 @@ import dev.mizarc.waystonewarps.application.services.ConfigService
 import dev.mizarc.waystonewarps.infrastructure.mappers.toPosition3D
 import dev.mizarc.waystonewarps.infrastructure.services.geyser.BedrockWarpManagementMenu
 import dev.mizarc.waystonewarps.infrastructure.services.geyser.BedrockWarpMenu
+import dev.mizarc.waystonewarps.infrastructure.services.geyser.BedrockWarpNamingMenu
 import dev.mizarc.waystonewarps.interaction.localization.LocalizationKeys
 import dev.mizarc.waystonewarps.infrastructure.services.geyser.GeyserMenuIntegration
 import dev.mizarc.waystonewarps.interaction.localization.LocalizationProvider
@@ -210,8 +211,13 @@ class WaystoneInteractListener(
                 return
             }
 
-            // Open the menu
-            menuNavigator.openMenu(WarpNamingMenu(player, menuNavigator, clickedBlock.location))
+            // Open the naming menu (Bedrock custom form or Java anvil GUI)
+            if (isBedrockPlayer(player)) {
+                val api = geyserMenuIntegration?.getApi() ?: return
+                BedrockWarpNamingMenu(player, api, clickedBlock.location).open()
+            } else {
+                menuNavigator.openMenu(WarpNamingMenu(player, menuNavigator, clickedBlock.location))
+            }
         }
     }
 }
