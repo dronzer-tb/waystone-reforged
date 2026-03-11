@@ -54,6 +54,9 @@ class WaystoneInteractListener(
     private val bedrockInteractCooldowns = mutableMapOf<UUID, Long>()
     private val BEDROCK_COOLDOWN_MS = 3000L
 
+    // Track recent discoveries to prevent duplicate effects
+    private val recentDiscoveryEffects = mutableSetOf<Pair<UUID, UUID>>()
+
     private fun isBedrockPlayer(player: Player): Boolean {
         return geyserMenuIntegration?.isBedrockPlayer(player) == true
     }
@@ -156,10 +159,16 @@ class WaystoneInteractListener(
                     player.sendActionBar(Component.text("Warp ").color(PrimaryColourPalette.SUCCESS.color)
                         .append(Component.text(warp.name).color(AccentColourPalette.SUCCESS.color))
                         .append(Component.text( " has been discovered!").color(PrimaryColourPalette.SUCCESS.color)))
-                    clickedBlock.world.spawnParticle(Particle.TOTEM_OF_UNDYING, particleLocation, 20)
-                    // Skip sound for Bedrock players to prevent audio looping
-                    if (!isBedrockPlayer(player)) {
-                        clickedBlock.world.playSound(particleLocation, Sound.BLOCK_AMETHYST_BLOCK_HIT, SoundCategory.BLOCKS, 1.0f, 1.0f)
+
+                    // Play discovery effects only once per player-warp (guard against duplicate events)
+                    val discoveryKey = Pair(player.uniqueId, it.id)
+                    if (!recentDiscoveryEffects.contains(discoveryKey)) {
+                        recentDiscoveryEffects.add(discoveryKey)
+                        // Skip particles and sound entirely for Bedrock (TOTEM_OF_UNDYING has built-in audio on Bedrock)
+                        if (!isBedrockPlayer(player)) {
+                            clickedBlock.world.spawnParticle(Particle.TOTEM_OF_UNDYING, particleLocation, 20)
+                            clickedBlock.world.playSound(particleLocation, Sound.BLOCK_AMETHYST_BLOCK_HIT, SoundCategory.BLOCKS, 1.0f, 1.0f)
+                        }
                     }
                 } else {
                     // Already discovered - open warp menu if allowed

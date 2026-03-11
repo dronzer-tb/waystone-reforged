@@ -117,7 +117,11 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
         }
         pane.addItem(guiPrivacyItem, 0, 0)
 
-        // Slot 1: Player management
+        // Slot 1: Blank
+        val blankItem1 = ItemStack(Material.GRAY_STAINED_GLASS_PANE).name(Component.text(" "))
+        pane.addItem(GuiItem(blankItem1) { /* no action */ }, 1, 0)
+
+        // Slot 2: Player management
         val canManageWhitelist = PermissionHelper.canManageWhitelist(player, warp.playerId)
         val playerCount = getWarpPlayerAccess.execute(warp.id).count() - 1
         val playerCountItem = ItemStack(Material.PLAYER_HEAD)
@@ -135,9 +139,9 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
                 menuNavigator.openMenu(WarpPlayerMenu(player, menuNavigator, warp, localizationProvider))
             }
         }
-        pane.addItem(guiPlayerCountItem, 1, 0)
+        pane.addItem(guiPlayerCountItem, 2, 0)
 
-        // Slot 2: Home toggle (free to set, costs to unset)
+        // Slot 3: Home toggle (free to set, costs to unset)
         val canSetHome = PermissionHelper.canModifyWaystone(player, warp.playerId, "waystonewarps.home")
         val baseCost = playerAttributeService.getTeleportCost(player.uniqueId)
         val homeUnsetCost = baseCost * configService.getHomeUnsetCostMultiplier()
@@ -155,7 +159,6 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
         }
         val guiHomeItem = GuiItem(homeItem) {
             if (canSetHome) {
-                // Unsetting home costs money
                 if (warp.isHome) {
                     if (!checkAndDeductCost(player, homeUnsetCost)) {
                         player.sendMessage(Component.text("Not enough funds to unset home!", NamedTextColor.RED))
@@ -170,9 +173,9 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
                 open()
             }
         }
-        pane.addItem(guiHomeItem, 2, 0)
+        pane.addItem(guiHomeItem, 3, 0)
 
-        // Slot 3: Rename
+        // Slot 4: Rename
         val canRename = PermissionHelper.canRename(player, warp.playerId)
         val renamingItem = ItemStack(Material.NAME_TAG)
             .name(localizationProvider.get(player.uniqueId, LocalizationKeys.MENU_WARP_MANAGEMENT_RENAME))
@@ -189,18 +192,18 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
                 menuNavigator.openMenu(WarpRenamingMenu(player, menuNavigator, warp, localizationProvider))
             }
         }
-        pane.addItem(guiRenamingItem, 3, 0)
+        pane.addItem(guiRenamingItem, 4, 0)
 
-        // Slot 4: Skins
+        // Slot 5: Skins
         val skinViewItem = ItemStack(Material.valueOf(warp.block))
             .name(localizationProvider.get(player.uniqueId, LocalizationKeys.MENU_WARP_MANAGEMENT_SKINS))
             .lore(localizationProvider.get(player.uniqueId, LocalizationKeys.MENU_WARP_MANAGEMENT_SKINS_LORE))
         val guiSkinViewItem = GuiItem(skinViewItem) {
             menuNavigator.openMenu(WarpSkinsMenu(player, menuNavigator, localizationProvider))
         }
-        pane.addItem(guiSkinViewItem, 4, 0)
+        pane.addItem(guiSkinViewItem, 5, 0)
 
-        // Slot 5: Protection mode (costs to enable, free to disable)
+        // Slot 6: Protection mode (costs to enable, free to disable)
         val canToggleProtection = PermissionHelper.canModifyWaystone(player, warp.playerId, "waystonewarps.bypass.protection")
         val protectionEnableCost = baseCost * configService.getProtectionModeCostMultiplier()
         val protectionItem = if (warp.isProtected) {
@@ -217,7 +220,6 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
         }
         val guiProtectionItem = GuiItem(protectionItem) {
             if (canToggleProtection) {
-                // Enabling protection costs money
                 if (!warp.isProtected) {
                     if (!checkAndDeductCost(player, protectionEnableCost)) {
                         player.sendMessage(Component.text("Not enough funds to enable protection!", NamedTextColor.RED))
@@ -232,13 +234,11 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
                 open()
             }
         }
-        pane.addItem(guiProtectionItem, 5, 0)
+        pane.addItem(guiProtectionItem, 6, 0)
 
-        // Slot 6: Space (empty/decorative)
-        val spaceItem = ItemStack(Material.GRAY_STAINED_GLASS_PANE)
-            .name(Component.text(" "))
-        val guiSpaceItem = GuiItem(spaceItem) { /* no action */ }
-        pane.addItem(guiSpaceItem, 6, 0)
+        // Slot 7: Blank
+        val blankItem2 = ItemStack(Material.GRAY_STAINED_GLASS_PANE).name(Component.text(" "))
+        pane.addItem(GuiItem(blankItem2) { /* no action */ }, 7, 0)
 
         // Slot 8: Move
         val canRelocate = PermissionHelper.canRelocate(player, warp.playerId)
