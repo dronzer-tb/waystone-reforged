@@ -1,7 +1,9 @@
 package dev.mizarc.waystonewarps.infrastructure.services.geyser
 
 import com.geysermenu.companion.api.GeyserMenuAPI
+import dev.mizarc.waystonewarps.application.actions.management.ToggleHome
 import dev.mizarc.waystonewarps.application.actions.management.ToggleLock
+import dev.mizarc.waystonewarps.application.actions.management.ToggleProtection
 import dev.mizarc.waystonewarps.application.actions.management.UpdateWarpName
 import dev.mizarc.waystonewarps.application.results.UpdateWarpNameResult
 import dev.mizarc.waystonewarps.domain.warps.Warp
@@ -21,6 +23,8 @@ class BedrockWarpManagementMenu(
     private val warp: Warp
 ) : KoinComponent {
     private val toggleLock: ToggleLock by inject()
+    private val toggleHome: ToggleHome by inject()
+    private val toggleProtection: ToggleProtection by inject()
     private val updateWarpName: UpdateWarpName by inject()
     private val localizationProvider: LocalizationProvider by inject()
 
@@ -50,10 +54,46 @@ class BedrockWarpManagementMenu(
             actions.add { open() }
         }
 
-        // Rename (inform only - renaming requires text input which is a custom form)
+        // Home toggle
+        val homeStatus = if (warp.isHome) "§aSet" else "§7Not Set"
+        val canSetHome = PermissionHelper.canModifyWaystone(player, warp.playerId, "waystonewarps.home")
+        if (canSetHome) {
+            options.add("Home: $homeStatus (Toggle)")
+            actions.add {
+                toggleHome.execute(
+                    playerId = player.uniqueId,
+                    warpId = warp.id,
+                    bypassOwnership = player.hasPermission("waystonewarps.bypass.access_control"),
+                )
+                open()
+            }
+        } else {
+            options.add("Home: $homeStatus")
+            actions.add { open() }
+        }
+
+        // Rename
         if (PermissionHelper.canRename(player, warp.playerId)) {
             options.add("Rename Waystone")
             actions.add { openRenameForm() }
+        }
+
+        // Protection toggle
+        val protectionStatus = if (warp.isProtected) "§aOn" else "§cOff"
+        val canToggleProt = PermissionHelper.canModifyWaystone(player, warp.playerId, "waystonewarps.bypass.protection")
+        if (canToggleProt) {
+            options.add("Protection: $protectionStatus (Toggle)")
+            actions.add {
+                toggleProtection.execute(
+                    playerId = player.uniqueId,
+                    warpId = warp.id,
+                    bypassOwnership = player.hasPermission("waystonewarps.bypass.protection"),
+                )
+                open()
+            }
+        } else {
+            options.add("Protection: $protectionStatus")
+            actions.add { open() }
         }
 
         // Close

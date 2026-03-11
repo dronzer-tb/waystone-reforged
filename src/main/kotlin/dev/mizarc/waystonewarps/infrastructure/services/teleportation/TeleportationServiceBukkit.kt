@@ -43,8 +43,11 @@ class TeleportationServiceBukkit(private val playerAttributeService: PlayerAttri
             return TeleportResult.INTERWORLD_PERMISSION_DENIED
         }
 
+        // Half-price for home waystone
+        val costMultiplier = if (warp.isHome && warp.playerId == playerId) 0.5 else 1.0
+
         // Check for cost
-        val result = hasCost(player)
+        val result = hasCost(player, costMultiplier)
         if (!result) return TeleportResult.INSUFFICIENT_FUNDS
 
         // Check for lock
@@ -65,7 +68,7 @@ class TeleportationServiceBukkit(private val playerAttributeService: PlayerAttri
         offsetLocation.add(0.0, -2.0, 0.0)
 
         // Teleports the player instantaneously
-        deductCost(player)
+        deductCost(player, costMultiplier)
         clearArea(warp.position.toLocation(world))
         buildPlatform(warp.position.toLocation(world))
         player.addPotionEffect(PotionEffect(PotionEffectType.RESISTANCE, 200, 4, false, false))
@@ -92,7 +95,8 @@ class TeleportationServiceBukkit(private val playerAttributeService: PlayerAttri
         }
 
         // Cancel if player doesn't have the funds to teleport
-        val result = hasCost(player)
+        val costMultiplier = if (warp.isHome && warp.playerId == playerId) 0.5 else 1.0
+        val result = hasCost(player, costMultiplier)
         if (!result) {
             onInsufficientFunds()
             return
@@ -162,8 +166,8 @@ class TeleportationServiceBukkit(private val playerAttributeService: PlayerAttri
         return Result.success(Unit)
     }
 
-    private fun hasCost(player: Player): Boolean {
-        val teleportCost = playerAttributeService.getTeleportCost(player.uniqueId)
+    private fun hasCost(player: Player, costMultiplier: Double = 1.0): Boolean {
+        val teleportCost = playerAttributeService.getTeleportCost(player.uniqueId) * costMultiplier
 
         return when (configService.getTeleportCostType()) {
             CostType.ITEM -> {
@@ -179,8 +183,8 @@ class TeleportationServiceBukkit(private val playerAttributeService: PlayerAttri
         }
     }
 
-    private fun deductCost(player: Player) {
-        val teleportCost = playerAttributeService.getTeleportCost(player.uniqueId)
+    private fun deductCost(player: Player, costMultiplier: Double = 1.0) {
+        val teleportCost = playerAttributeService.getTeleportCost(player.uniqueId) * costMultiplier
         when (configService.getTeleportCostType()) {
             CostType.ITEM -> {
                 val material = try {

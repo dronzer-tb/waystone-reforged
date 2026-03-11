@@ -77,4 +77,12 @@ interface WarpRepository {
      * @param id The id of the warp to remove.
      */
     fun remove(id: UUID)
+
+    /**
+     * Gets a player's home waystone.
+     *
+     * @param playerId The player to retrieve the home warp for.
+     * @return The home warp, or null if not set.
+     */
+    fun getHomeWarp(playerId: UUID): Warp?
 }

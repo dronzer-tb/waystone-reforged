@@ -20,7 +20,10 @@ import dev.mizarc.waystonewarps.application.actions.discovery.RevokeDiscovery
 import dev.mizarc.waystonewarps.application.actions.discovery.ToggleFavouriteDiscovery
 import dev.mizarc.waystonewarps.application.actions.management.GetAllWarpSkins
 import dev.mizarc.waystonewarps.application.actions.management.GetOwnedWarps
+import dev.mizarc.waystonewarps.application.actions.management.ToggleHome
 import dev.mizarc.waystonewarps.application.actions.management.ToggleLock
+import dev.mizarc.waystonewarps.application.actions.management.ToggleProtection
+import dev.mizarc.waystonewarps.application.actions.management.GetHomeWarp
 import dev.mizarc.waystonewarps.application.actions.management.UpdateWarpName
 import dev.mizarc.waystonewarps.application.actions.management.UpdateWarpSkin
 import dev.mizarc.waystonewarps.application.actions.whitelist.ToggleWhitelist
@@ -45,6 +48,7 @@ import dev.mizarc.waystonewarps.infrastructure.persistence.discoveries.Discovery
 import dev.mizarc.waystonewarps.infrastructure.persistence.playerstate.PlayerStateRepositoryMemory
 import dev.mizarc.waystonewarps.infrastructure.persistence.migrations.Migration0_CreateInitialTables
 import dev.mizarc.waystonewarps.infrastructure.persistence.migrations.Migration1_AddWarpIconMeta
+import dev.mizarc.waystonewarps.infrastructure.persistence.migrations.Migration2_AddHomeAndProtection
 import dev.mizarc.waystonewarps.infrastructure.persistence.migrations.SchemaMigrator
 import dev.mizarc.waystonewarps.infrastructure.persistence.storage.SQLiteStorage
 import dev.mizarc.waystonewarps.infrastructure.persistence.storage.Storage
@@ -54,6 +58,7 @@ import dev.mizarc.waystonewarps.infrastructure.services.*
 import dev.mizarc.waystonewarps.infrastructure.services.geyser.GeyserMenuIntegration
 import dev.mizarc.waystonewarps.infrastructure.services.teleportation.TeleportationServiceBukkit
 import dev.mizarc.waystonewarps.infrastructure.services.scheduling.SchedulerServiceBukkit
+import dev.mizarc.waystonewarps.interaction.commands.HomeCommand
 import dev.mizarc.waystonewarps.interaction.commands.InvalidsCommand
 import dev.mizarc.waystonewarps.interaction.commands.WarpCreateCommand
 import dev.mizarc.waystonewarps.interaction.listeners.*
@@ -116,6 +121,7 @@ class WaystoneWarps: JavaPlugin() {
                 migrations = listOf(
                     Migration0_CreateInitialTables(),
                     Migration1_AddWarpIconMeta(),
+                    Migration2_AddHomeAndProtection(),
                 ),
             ).migrateToLatest()
         } catch (ex: Exception) {
@@ -247,6 +253,9 @@ class WaystoneWarps: JavaPlugin() {
             single { ToggleLock(warpRepository, warpEventPublisher) }
             single { GetWhitelistedPlayers(whitelistRepository) }
             single { ToggleWhitelist(whitelistRepository, warpRepository) }
+            single { ToggleHome(warpRepository, hologramService, warpEventPublisher) }
+            single { ToggleProtection(warpRepository, warpEventPublisher) }
+            single { GetHomeWarp(warpRepository) }
             single { RevokeDiscovery(discoveryRepository) }
             single { IsPositionInTeleportZone(warpRepository) }
             single { UpdateWarpSkin(warpRepository, structureBuilderService, configService, warpEventPublisher) }
@@ -261,6 +270,7 @@ class WaystoneWarps: JavaPlugin() {
             single { RemoveInvalidWarpsForWorld(warpRepository, worldService, discoveryRepository, whitelistRepository, warpEventPublisher) }
 
             single<LocalizationProvider> { PropertiesLocalizationProvider(configService, dataFolder, playerLocaleService) }
+            single<TeleportationService> { teleportationService }
         }
 
         startKoin { modules(repositories, actions) }
@@ -270,6 +280,7 @@ class WaystoneWarps: JavaPlugin() {
         commandManager.registerCommand(WarpMenuCommand())
         commandManager.registerCommand(InvalidsCommand())
         commandManager.registerCommand(WarpCreateCommand())
+        commandManager.registerCommand(HomeCommand())
     }
 
     private fun registerEvents() {

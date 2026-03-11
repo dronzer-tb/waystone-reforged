@@ -48,6 +48,14 @@ geyser:
   # The image path for the button icon (resource pack texture path).
   menu_button_image: "textures/items/compass_item"
 
+# Multiplier applied to the base teleport cost when unsetting a home waystone.
+# Example: If base cost is 4 and multiplier is 2, unsetting home costs 8.
+home_unset_cost_multiplier: 2
+
+# Cost multiplier to enable protection mode on a waystone.
+# Example: If base cost is 4 and multiplier is 5, enabling protection costs 20.
+protection_mode_cost_multiplier: 5
+
 # The blocks that can be used to transform the waystone appearance. This
 # contains all the required blocks that make up the waystone that must be in the
 # following order:

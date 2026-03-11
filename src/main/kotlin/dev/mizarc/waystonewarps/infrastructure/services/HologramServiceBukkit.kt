@@ -27,7 +27,18 @@ class HologramServiceBukkit(private val configService: ConfigService): HologramS
             .decorate(TextDecoration.BOLD)
         val coordinatesComponent = Component.text("X: ${warp.position.x}  Y: ${warp.position.y}  Z: ${warp.position.z}")
             .color(NamedTextColor.GRAY)
-        val componentsToJoin = listOf(nameComponent, coordinatesComponent)
+        val componentsToJoin = mutableListOf<Component>(nameComponent, coordinatesComponent)
+
+        // Add home indicator if this warp is set as home
+        if (warp.isHome) {
+            val ownerName = Bukkit.getOfflinePlayer(warp.playerId).name ?: "Unknown"
+            val homeComponent = Component.text()
+                .append(Component.text("Home: ", NamedTextColor.GREEN))
+                .append(Component.text(ownerName, NamedTextColor.LIGHT_PURPLE))
+                .build()
+            componentsToJoin.add(1, homeComponent)
+        }
+
         val combinedText = Component.join(
             JoinConfiguration.separator(Component.newline()), componentsToJoin)
 

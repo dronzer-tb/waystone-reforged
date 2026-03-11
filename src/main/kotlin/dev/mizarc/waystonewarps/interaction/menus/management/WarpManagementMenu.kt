@@ -4,7 +4,9 @@ import com.github.stefvanschie.inventoryframework.gui.GuiItem
 import com.github.stefvanschie.inventoryframework.gui.type.ChestGui
 import com.github.stefvanschie.inventoryframework.pane.StaticPane
 import dev.mizarc.waystonewarps.application.actions.discovery.GetWarpPlayerAccess
+import dev.mizarc.waystonewarps.application.actions.management.ToggleHome
 import dev.mizarc.waystonewarps.application.actions.management.ToggleLock
+import dev.mizarc.waystonewarps.application.actions.management.ToggleProtection
 import dev.mizarc.waystonewarps.domain.warps.Warp
 import dev.mizarc.waystonewarps.interaction.localization.LocalizationKeys
 import dev.mizarc.waystonewarps.interaction.localization.LocalizationProvider
@@ -16,7 +18,7 @@ import dev.mizarc.waystonewarps.interaction.utils.getWarpMoveTool
 import dev.mizarc.waystonewarps.interaction.utils.lore
 import dev.mizarc.waystonewarps.interaction.utils.name
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.format.TextColor
+import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.format.TextDecoration
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -28,6 +30,8 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
                          private val warp: Warp): Menu, KoinComponent {
     private val getWarpPlayerAccess: GetWarpPlayerAccess by inject()
     private val toggleLock: ToggleLock by inject()
+    private val toggleHome: ToggleHome by inject()
+    private val toggleProtection: ToggleProtection by inject()
     private val localizationProvider: LocalizationProvider by inject()
 
     override fun open() {
@@ -38,7 +42,7 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
         val pane = StaticPane(0, 0, 9, 1)
         gui.addPane(pane)
 
-        // Add privacy modes
+        // Slot 0: Access toggle (Public/Private)
         val canChangeAccess = PermissionHelper.canChangeAccessControl(player, warp.playerId)
 
         val privacyIcon: ItemStack = if (warp.isLocked) {
@@ -106,7 +110,7 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
         }
         pane.addItem(guiPrivacyItem, 0, 0)
 
-        // Add player count icon
+        // Slot 1: Player management
         val canManageWhitelist = PermissionHelper.canManageWhitelist(player, warp.playerId)
         val playerCount = getWarpPlayerAccess.execute(warp.id).count() - 1
         val playerCountItem = ItemStack(Material.PLAYER_HEAD)
@@ -126,7 +130,33 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
         }
         pane.addItem(guiPlayerCountItem, 1, 0)
 
-        // Add renaming icon
+        // Slot 2: Home toggle
+        val canSetHome = PermissionHelper.canModifyWaystone(player, warp.playerId, "waystonewarps.home")
+        val homeItem = if (warp.isHome) {
+            ItemStack(Material.RED_BED)
+                .name(Component.text("Home", NamedTextColor.GREEN).decoration(TextDecoration.ITALIC, false))
+                .lore("§7This waystone is set as your home.", "§eClick to unset home.")
+        } else {
+            ItemStack(Material.WHITE_BED)
+                .name(Component.text("Home", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false))
+                .lore("§7Set this waystone as your home.", "§7Home warps have reduced teleport cost.", "§eClick to set as home.")
+        }
+        if (!canSetHome) {
+            homeItem.lore("§7Home waystone setting.", "§cYou don't have permission.")
+        }
+        val guiHomeItem = GuiItem(homeItem) {
+            if (canSetHome) {
+                toggleHome.execute(
+                    playerId = player.uniqueId,
+                    warpId = warp.id,
+                    bypassOwnership = player.hasPermission("waystonewarps.bypass.access_control"),
+                )
+                open()
+            }
+        }
+        pane.addItem(guiHomeItem, 2, 0)
+
+        // Slot 3: Rename
         val canRename = PermissionHelper.canRename(player, warp.playerId)
         val renamingItem = ItemStack(Material.NAME_TAG)
             .name(localizationProvider.get(player.uniqueId, LocalizationKeys.MENU_WARP_MANAGEMENT_RENAME))
@@ -145,7 +175,7 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
         }
         pane.addItem(guiRenamingItem, 3, 0)
 
-        // Add skins menu
+        // Slot 4: Skins
         val skinViewItem = ItemStack(Material.valueOf(warp.block))
             .name(localizationProvider.get(player.uniqueId, LocalizationKeys.MENU_WARP_MANAGEMENT_SKINS))
             .lore(localizationProvider.get(player.uniqueId, LocalizationKeys.MENU_WARP_MANAGEMENT_SKINS_LORE))
@@ -154,7 +184,39 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
         }
         pane.addItem(guiSkinViewItem, 4, 0)
 
-        // Add move icon
+        // Slot 5: Protection mode
+        val canToggleProtection = PermissionHelper.canModifyWaystone(player, warp.playerId, "waystonewarps.bypass.protection")
+        val protectionItem = if (warp.isProtected) {
+            ItemStack(Material.OBSIDIAN)
+                .name(Component.text("Protection: On", NamedTextColor.GREEN).decoration(TextDecoration.ITALIC, false))
+                .lore("§7Only the owner can break this waystone.", "§7Other players take damage when attempting.", "§eClick to disable protection.")
+        } else {
+            ItemStack(Material.CRYING_OBSIDIAN)
+                .name(Component.text("Protection: Off", NamedTextColor.RED).decoration(TextDecoration.ITALIC, false))
+                .lore("§7Anyone can break this waystone.", "§eClick to enable protection.")
+        }
+        if (!canToggleProtection) {
+            protectionItem.lore("§7Waystone protection mode.", "§cYou don't have permission.")
+        }
+        val guiProtectionItem = GuiItem(protectionItem) {
+            if (canToggleProtection) {
+                toggleProtection.execute(
+                    playerId = player.uniqueId,
+                    warpId = warp.id,
+                    bypassOwnership = player.hasPermission("waystonewarps.bypass.protection"),
+                )
+                open()
+            }
+        }
+        pane.addItem(guiProtectionItem, 5, 0)
+
+        // Slot 6: Space (empty/decorative)
+        val spaceItem = ItemStack(Material.GRAY_STAINED_GLASS_PANE)
+            .name(Component.text(" "))
+        val guiSpaceItem = GuiItem(spaceItem) { /* no action */ }
+        pane.addItem(guiSpaceItem, 6, 0)
+
+        // Slot 8: Move
         val canRelocate = PermissionHelper.canRelocate(player, warp.playerId)
         val moveItem = ItemStack(Material.PISTON)
             .name(localizationProvider.get(player.uniqueId, LocalizationKeys.MENU_WARP_MANAGEMENT_MOVE))

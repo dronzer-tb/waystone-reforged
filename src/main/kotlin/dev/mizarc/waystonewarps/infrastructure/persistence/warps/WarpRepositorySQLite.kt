@@ -51,9 +51,10 @@ class WarpRepositorySQLite(private val storage: Storage<Database>): WarpReposito
         warps[warp.id] = warp
         val iconMetaJsonString = iconMetaJson.encodeToString(warp.iconMeta)
         storage.connection.executeInsert("INSERT INTO warps (id, playerId, creationTime, name, worldId, " +
-                "positionX, positionY, positionZ, icon, iconMeta, block, isLocked) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+                "positionX, positionY, positionZ, icon, iconMeta, block, isLocked, isHome, isProtected) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
             warp.id, warp.playerId, warp.creationTime, warp.name, warp.worldId,
-            warp.position.x, warp.position.y, warp.position.z, warp.icon, iconMetaJsonString, warp.block, warp.isLocked)
+            warp.position.x, warp.position.y, warp.position.z, warp.icon, iconMetaJsonString, warp.block, warp.isLocked,
+            warp.isHome, warp.isProtected)
     }
 
     override fun update(warp: Warp) {
@@ -61,15 +62,19 @@ class WarpRepositorySQLite(private val storage: Storage<Database>): WarpReposito
         warps[warp.id] = warp
         val iconMetaJsonString = iconMetaJson.encodeToString(warp.iconMeta)
         storage.connection.executeUpdate("UPDATE warps SET playerId=?, creationTime=?, name=?, worldId=?, " +
-                "positionX=?, positionY=?, positionZ=?, icon=?, iconMeta=?, block=?, isLocked=? WHERE id=?",
+                "positionX=?, positionY=?, positionZ=?, icon=?, iconMeta=?, block=?, isLocked=?, isHome=?, isProtected=? WHERE id=?",
             warp.playerId, warp.creationTime, warp.name, warp.worldId, warp.position.x, warp.position.y,
-            warp.position.z, warp.icon, iconMetaJsonString, warp.block, warp.isLocked, warp.id)
+            warp.position.z, warp.icon, iconMetaJsonString, warp.block, warp.isLocked, warp.isHome, warp.isProtected, warp.id)
         return
     }
 
     override fun remove(id: UUID) {
         warps.remove(id)
         storage.connection.executeUpdate("DELETE FROM warps WHERE id=?", id)
+    }
+
+    override fun getHomeWarp(playerId: UUID): Warp? {
+        return warps.values.firstOrNull { it.playerId == playerId && it.isHome }
     }
 
     private fun preload() {
@@ -100,7 +105,9 @@ class WarpRepositorySQLite(private val storage: Storage<Database>): WarpReposito
                 result.getString("icon"),
                 iconMeta,
                 result.getString("block"),
-                result.getInt("isLocked") != 0)
+                result.getInt("isLocked") != 0,
+                result.getInt("isHome") != 0,
+                result.getInt("isProtected") != 0)
         }
     }
 }

@@ -39,9 +39,21 @@ class WaystoneDestructionListener: Listener, KoinComponent {
         val bottomBlockPosition = event.block.location.toPosition3D()
         val topBlockPosition = event.block.location.clone().apply { y += 1 }.toPosition3D()
 
-        // Break and perform action based on result
+        // Check if either position is a waystone
         val positions = listOf(topBlockPosition, bottomBlockPosition)
         for (position in positions) {
+            val warp = getWarpAtPosition.execute(position, event.block.world.uid) ?: continue
+
+            // Protection mode: only owner can break, others take thorns damage
+            if (warp.isProtected && warp.playerId != event.player.uniqueId
+                && !event.player.hasPermission("waystonewarps.bypass.protection")) {
+                event.isCancelled = true
+                event.player.damage(4.0) // 2 hearts thorns-like damage
+                event.player.sendActionBar(
+                    Component.text("This waystone is protected!").color(TextColor.color(255, 85, 85)))
+                return
+            }
+
             val result = breakWarpBlock.execute(position, event.block.world.uid)
             when (result) {
                 is BreakWarpResult.Success -> triggerSuccess(event.player, result.warp)

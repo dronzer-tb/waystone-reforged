@@ -5,6 +5,7 @@ main: dev.mizarc.waystonewarps.WaystoneWarps
 softdepend:
   - GeyserMenuCompanion
   - floodgate
+  - Essentials
 libraries:
   - org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0
   - org.jetbrains.kotlin:kotlin-stdlib:2.3.0
@@ -25,6 +26,7 @@ permissions:
       waystonewarps.bypass.rename: true
       waystonewarps.bypass.relocate: true
       waystonewarps.bypass.open_menu: true
+      waystonewarps.bypass.protection: true
       waystonewarps.create: true
 
   waystonewarps.create:
@@ -86,3 +88,11 @@ permissions:
   waystonewarps.teleport.cooldown_bypass:
     description: Bypasses the cooldown between teleportations
     default: op
+
+  waystonewarps.bypass.protection:
+    description: Can bypass waystone protection mode
+    default: op
+
+  waystonewarps.home:
+    description: Can set a waystone as home and teleport to it
+    default: true

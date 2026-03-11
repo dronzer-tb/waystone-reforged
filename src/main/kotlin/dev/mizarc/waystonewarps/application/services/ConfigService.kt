@@ -21,4 +21,8 @@ interface ConfigService {
     fun getGeyserMenuButtonText(): String
     fun getGeyserMenuButtonPriority(): Int
     fun getGeyserMenuButtonImage(): String
+
+    // Home & Protection
+    fun getHomeUnsetCostMultiplier(): Double
+    fun getProtectionModeCostMultiplier(): Double
 }

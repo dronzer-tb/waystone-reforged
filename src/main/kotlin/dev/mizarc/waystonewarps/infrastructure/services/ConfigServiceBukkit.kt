@@ -72,4 +72,12 @@ class ConfigServiceBukkit(private val configFile: FileConfiguration): ConfigServ
     override fun getGeyserMenuButtonImage(): String {
         return configFile.getString("geyser.menu_button_image", "textures/items/compass_item").toString()
     }
+
+    override fun getHomeUnsetCostMultiplier(): Double {
+        return configFile.getDouble("home_unset_cost_multiplier", 2.0)
+    }
+
+    override fun getProtectionModeCostMultiplier(): Double {
+        return configFile.getDouble("protection_mode_cost_multiplier", 5.0)
+    }
 }
