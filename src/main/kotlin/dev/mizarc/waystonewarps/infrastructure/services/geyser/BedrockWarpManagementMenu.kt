@@ -41,42 +41,42 @@ class BedrockWarpManagementMenu(
 
         // 0: Public / Private
         if (warp.isLocked) {
-            buttons.add(FormButton("§l§0Private", imagePath = "textures/blocks/redstone_torch_on"))
+            buttons.add(FormButton("§l§8Private", imagePath = "textures/blocks/redstone_torch_on"))
         } else {
-            buttons.add(FormButton("§l§0Public", imagePath = "textures/blocks/lever"))
+            buttons.add(FormButton("§l§8Public", imagePath = "textures/blocks/lever"))
         }
 
         // 1: Discovered Players
-        buttons.add(FormButton("§l§0Discovered Players", imagePath = "textures/ui/icon_steve"))
+        buttons.add(FormButton("§l§8Discovered Players", imagePath = "textures/ui/icon_steve"))
 
         // 2: Rename
-        buttons.add(FormButton("§l§0Rename", imagePath = "textures/items/name_tag"))
+        buttons.add(FormButton("§l§8Rename", imagePath = "textures/items/name_tag"))
 
         // 3: Skins
-        buttons.add(FormButton("§l§0Skins", imagePath = "textures/blocks/lodestone_top"))
+        buttons.add(FormButton("§l§8Skins", imageUrl = "https://static.wikia.nocookie.net/minecraft_gamepedia/images/3/32/Lodestone_JE1_BE1.png/revision/latest?cb=20200325183527"))
 
         // 4: Home
         if (warp.isHome) {
-            buttons.add(FormButton("§l§0Home §c(On)", imagePath = "textures/items/bed_red"))
+            buttons.add(FormButton("§l§8Home §c(On)", imagePath = "textures/items/bed_red"))
         } else {
-            buttons.add(FormButton("§l§0Home §7(Off)", imagePath = "textures/items/bed_white"))
+            buttons.add(FormButton("§l§8Home §8(Off)", imagePath = "textures/items/bed_white"))
         }
 
         // 5: Move
-        buttons.add(FormButton("§l§0Move", imagePath = "textures/blocks/piston_side"))
+        buttons.add(FormButton("§l§8Move", imagePath = "textures/blocks/piston_side"))
 
         // 6: Protection
         if (warp.isProtected) {
-            buttons.add(FormButton("§l§0Protection §a(On)", imagePath = "textures/blocks/obsidian"))
+            buttons.add(FormButton("§l§8Protection §a(On)", imageUrl = "https://static.wikia.nocookie.net/minecraft_gamepedia/images/9/99/Obsidian_JE3_BE2.png/revision/latest?cb=20200124042057"))
         } else {
-            buttons.add(FormButton("§l§0Protection §7(Off)", imagePath = "textures/blocks/crying_obsidian"))
+            buttons.add(FormButton("§l§8Protection §8(Off)", imageUrl = "https://static.wikia.nocookie.net/minecraft_gamepedia/images/7/7f/Crying_Obsidian_JE1_BE1.png/revision/latest?cb=20200302214526"))
         }
 
         // 7: Back
-        buttons.add(FormButton("§l§0Back", imagePath = "textures/items/nether_star"))
+        buttons.add(FormButton("§l§8Back", imagePath = "textures/items/nether_star"))
 
         BedrockSupport.sendSimpleForm(player,
-            title = "§l§0Waystone Editor - ${warp.name}",
+            title = "§l§8Waystone Editor - ${warp.name}",
             content = "",
             buttons = buttons,
             onButtonClicked = { index ->
@@ -112,9 +112,9 @@ class BedrockWarpManagementMenu(
 
         if (discoveredPlayerIds.isEmpty()) {
             BedrockSupport.sendSimpleForm(player,
-                title = "§l§0Discovered Players",
+                title = "§l§8Discovered Players",
                 content = "No players have discovered this waystone yet.",
-                buttons = listOf(FormButton("§l§0Back", imagePath = "textures/items/nether_star")),
+                buttons = listOf(FormButton("§l§8Back", imagePath = "textures/items/nether_star")),
                 onButtonClicked = { open() }
             )
             return
@@ -122,14 +122,15 @@ class BedrockWarpManagementMenu(
 
         val buttons = discoveredPlayerIds.map { uuid ->
             val name = Bukkit.getOfflinePlayer(uuid).name ?: uuid.toString().take(8)
+            val ownerTag = if (uuid == warp.playerId) " §6★" else ""
             val whitelistTag = if (whitelistedIds.contains(uuid)) " §a✔" else ""
-            FormButton("§l§0$name$whitelistTag", imagePath = "textures/ui/icon_steve")
+            FormButton("§l§8$name$ownerTag$whitelistTag", imagePath = "textures/ui/icon_steve")
         }.toMutableList()
-        buttons.add(FormButton("§l§0Back", imagePath = "textures/items/nether_star"))
+        buttons.add(FormButton("§l§8Back", imagePath = "textures/items/nether_star"))
 
         BedrockSupport.sendSimpleForm(player,
-            title = "§l§0Discovered Players - ${warp.name}",
-            content = "Select a player to manage. §a✔ = whitelisted",
+            title = "§l§8Discovered Players - ${warp.name}",
+            content = "Select a player to manage. §a✔ = whitelisted §6★ = owner",
             buttons = buttons,
             onButtonClicked = { index ->
                 if (index >= discoveredPlayerIds.size) {
@@ -144,57 +145,79 @@ class BedrockWarpManagementMenu(
     private fun openPlayerActionMenu(targetId: java.util.UUID) {
         val targetName = Bukkit.getOfflinePlayer(targetId).name ?: targetId.toString().take(8)
         val isWhitelisted = getWhitelistedPlayers.execute(warp.id).contains(targetId)
+        val isOwner = targetId == warp.playerId
 
-        val whitelistLabel = if (isWhitelisted) "§l§0Remove from Whitelist" else "§l§0Add to Whitelist"
+        val whitelistLabel = if (isWhitelisted) "§l§8Remove from Whitelist" else "§l§8Add to Whitelist"
 
-        val buttons = listOf(
-            FormButton(whitelistLabel, imagePath = "textures/items/lantern"),
-            FormButton("§l§cRevoke Discovery", imagePath = "textures/items/barrier"),
-            FormButton("§l§0Back", imagePath = "textures/items/nether_star")
+        val buttons = mutableListOf(
+            FormButton(whitelistLabel, imagePath = "textures/items/lantern")
         )
+        // Owner cannot be revoked
+        if (!isOwner) {
+            buttons.add(FormButton("§l§cRevoke Discovery", imageUrl = "https://mcdf.wiki.gg/images/Barrier.png?ff8ff1"))
+        }
+        buttons.add(FormButton("§l§8Back", imagePath = "textures/items/nether_star"))
+
+        val statusText = buildString {
+            if (isOwner) append("§6Owner of this waystone\n")
+            append(if (isWhitelisted) "§aCurrently whitelisted" else "§7Not whitelisted")
+        }
 
         BedrockSupport.sendSimpleForm(player,
-            title = "§l§0Player: $targetName",
-            content = if (isWhitelisted) "§aCurrently whitelisted" else "§7Not whitelisted",
+            title = "§l§8Player: $targetName",
+            content = statusText,
             buttons = buttons,
             onButtonClicked = { index ->
-                when (index) {
-                    0 -> {
-                        val result = toggleWhitelist.execute(player.uniqueId, warp.id, targetId)
-                        if (result.isSuccess) {
-                            val added = result.getOrNull() == true
-                            player.sendMessage(if (added) "§a$targetName added to whitelist." else "§c$targetName removed from whitelist.")
-                        } else {
-                            player.sendMessage("§cFailed to toggle whitelist.")
+                // Button indices shift if owner (no revoke button)
+                if (isOwner) {
+                    when (index) {
+                        0 -> {
+                            handleWhitelistToggle(targetId, targetName)
                         }
-                        openDiscoveredPlayersMenu()
+                        1 -> openDiscoveredPlayersMenu()
                     }
-                    1 -> {
-                        // Confirm revoke
-                        BedrockSupport.sendModalForm(player,
-                            title = "Revoke Discovery",
-                            content = "Remove §e$targetName§r's discovery of this waystone?",
-                            button1 = "§cYes, Revoke",
-                            button2 = "§aCancel",
-                            onButton1 = {
-                                revokeDiscovery.execute(targetId, warp.id)
-                                player.sendMessage("§c$targetName's discovery revoked.")
-                                openDiscoveredPlayersMenu()
-                            },
-                            onButton2 = { openPlayerActionMenu(targetId) }
-                        )
+                } else {
+                    when (index) {
+                        0 -> {
+                            handleWhitelistToggle(targetId, targetName)
+                        }
+                        1 -> {
+                            BedrockSupport.sendModalForm(player,
+                                title = "§l§8Revoke Discovery",
+                                content = "Remove §e$targetName§r's discovery of this waystone?",
+                                button1 = "§cYes, Revoke",
+                                button2 = "§aCancel",
+                                onButton1 = {
+                                    revokeDiscovery.execute(targetId, warp.id)
+                                    player.sendMessage("§c$targetName's discovery revoked.")
+                                    openDiscoveredPlayersMenu()
+                                },
+                                onButton2 = { openPlayerActionMenu(targetId) }
+                            )
+                        }
+                        2 -> openDiscoveredPlayersMenu()
                     }
-                    2 -> openDiscoveredPlayersMenu()
                 }
             }
         )
+    }
+
+    private fun handleWhitelistToggle(targetId: java.util.UUID, targetName: String) {
+        val result = toggleWhitelist.execute(player.uniqueId, warp.id, targetId)
+        if (result.isSuccess) {
+            val added = result.getOrNull() == true
+            player.sendMessage(if (added) "§a$targetName added to whitelist." else "§c$targetName removed from whitelist.")
+        } else {
+            player.sendMessage("§cFailed to toggle whitelist.")
+        }
+        openDiscoveredPlayersMenu()
     }
 
     // --- Rename ---
 
     private fun openRenameForm() {
         BedrockSupport.sendCustomForm(player,
-            title = "§l§0Rename Waystone",
+            title = "§l§8Rename Waystone",
             elements = listOf(
                 FormElement.Input("name", "New Name", "Enter new name", warp.name)
             ),
@@ -231,7 +254,7 @@ class BedrockWarpManagementMenu(
             val unsetCost = baseCost * multiplier
 
             BedrockSupport.sendModalForm(player,
-                title = "§l§0Unset Home",
+                title = "§l§8Unset Home",
                 content = "Unsetting your home will cost §e${unsetCost.toInt()}§r. Continue?",
                 button1 = "§aYes, Unset",
                 button2 = "§cCancel",
@@ -268,7 +291,7 @@ class BedrockWarpManagementMenu(
 
     private fun handleMove() {
         BedrockSupport.sendModalForm(player,
-            title = "§l§0Move Waystone",
+            title = "§l§8Move Waystone",
             content = "Move this waystone to your current location?",
             button1 = "§aYes, Move",
             button2 = "§cCancel",
@@ -289,7 +312,7 @@ class BedrockWarpManagementMenu(
             val protCost = baseCost * multiplier
 
             BedrockSupport.sendModalForm(player,
-                title = "§l§0Enable Protection",
+                title = "§l§8Enable Protection",
                 content = "Enabling protection will cost §e${protCost.toInt()}§r. Continue?",
                 button1 = "§aYes, Enable",
                 button2 = "§cCancel",
