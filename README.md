@@ -4,6 +4,34 @@
 
 Transform your travels with the Waystone Warps plugin! Craft and place waystones to set up teleportation points throughout your world. Discover new waystones placed by others as you explore and easily teleport between them. Streamline your journey across the world knowing you can always teleport back home in a snap, or simply visit your friends in an instant.
 
+## 🆕 Recent Major Changes
+
+### Version 1.0.0 - Complete Bedrock Integration & Feature Expansion
+
+**Critical Bug Fixes:**
+- **Bedrock Menu Timeout Fix** - Fixed issue where menus stopped appearing after 15-20 minutes by implementing aggressive keepalive with real API calls (5-second interval instead of 10-second status checks)
+
+**New Features:**
+- **Home Waystone System** - Set one personal waystone as home with `/home` command and reduced teleport costs
+- **Protection Mode** - Lock waystones to prevent non-owners from breaking them with thorns defense damage
+- **Bedrock Warp Deletion** - Replace Move option with permanent Delete button in Bedrock editor menu
+- **Full GeyserMC Integration** - Native Bedrock forms for all menu interactions (custom forms, modals, and simple menus)
+- **Bedrock Main Menu Buttons** - Quick access "Warp" and "Home" buttons in GeyserMenu interface
+
+**UI/UX Improvements:**
+- **Bedrock Editor Menu Redesign** - Complete overhaul with Minecraft texture paths for icons
+- **Sub-Menu System** - Organized menu hierarchy for search, filters, and discovered players
+- **Favorite Markers** - Visual indicators (♥) for favorited waystones
+- **Owner Markers** - Visual indicators (★) for owned waystones
+- **Search Functionality** - Find waystones by name in both Java and Bedrock menus
+
+**Technical Improvements:**
+- **Pure Reflection API** - Full JDK 21+ support with reflection-based GeyserMenu integration
+- **Stable Connections** - Aggressive keepalive prevents internal GeyserMenu timeout
+- **Icon Removal** - Simplified UI by removing waystone icon customization feature
+- **Schema Migration** - Added database migrations for Home and Protection features
+- **Particle Optimization** - Fixed looping particle issues on Bedrock clients
+
 ## Core Features
 
 ### Waystone Creation & Management
@@ -169,16 +197,159 @@ Without GeyserMenu Companion, Bedrock players can still use waystones through th
 - **Stable Connection** - 5-second keepalive prevents connection timeouts
 - **Full Feature Parity** - All Java features available to Bedrock players
 
+## Configuration
+
+The plugin stores configuration in `config.yml`. Key settings include:
+
+- **Teleportation Costs** - Set base costs in XP, items, or economy currency
+- **Teleportation Timer** - Delay before teleportation occurs (in seconds)
+- **Cooldown Duration** - Time between teleports for each player
+- **Protection Mode Multiplier** - Cost multiplier for enabling protection (default 5×)
+- **Home Unset Cost Multiplier** - Cost multiplier for disabling home waystone (default 2×)
+- **Home Teleport Reduction** - Home teleport cost reduction (default 0.5×)
+- **Compass Menu** - Toggle waystone menu on compass right-click
+- **Lodestone Menu** - Toggle waystone menu on lodestone right-click
+
+Example configuration values can be found in `sample-config.yml` after first run.
+
+## Architecture
+
+Waystone Warps uses a clean layered architecture:
+
+```
+┌─────────────────────────────────────────┐
+│         Interaction (UI/Commands)       │  - Menus, Forms, Commands
+├─────────────────────────────────────────┤
+│         Application (Actions/Services)  │  - Use cases, orchestration
+├─────────────────────────────────────────┤
+│           Domain (Business Logic)       │  - Entities, repositories
+├─────────────────────────────────────────┤
+│      Infrastructure (Data & External)   │  - SQLite, Bukkit, GeyserMenu
+└─────────────────────────────────────────┘
+```
+
+### Components
+
+**Interaction Layer:**
+- Command handlers (WarpMenuCommand, HomeCommand, InvalidsCommand, etc.)
+- Menu implementations (Java GUI, Bedrock forms)
+- Event listeners (discovery, destruction, placement)
+
+**Application Layer:**
+- Action classes (CreateWarp, TeleportPlayer, ToggleHome, etc.)
+- Service classes (movement tracking, particles, holograms)
+- Configuration management
+- Event publishing system
+
+**Domain Layer:**
+- Warp entity with ownership, privacy, home, and protection flags
+- Repositories for warps, discoveries, whitelist, and player state
+- Business rules and validation
+
+**Infrastructure Layer:**
+- SQLite persistence with schema migrations
+- Bukkit/Paper integration
+- GeyserMenu reflection-based integration
+- Vault integration for economy and permissions
+
+## Database Schema
+
+Waystone Warps uses SQLite with the following main tables:
+
+- **warps** - Waystone data (name, location, owner, privacy, skins, home, protection)
+- **discoveries** - Player waystone discoveries with favorite status
+- **whitelist** - Waystone access control per player
+- **player_state** - In-memory player session state
+
+Schema is automatically created and migrated on first run.
+
+## API
+
+The plugin exposes a public API through `WaystoneWarpsAPI`:
+
+```kotlin
+WaystoneWarpsAPI.getInstance()?.getWarpRepository()?.getAll()
+```
+
+**Available Events:**
+- `WarpCreateEvent` - Fired when a waystone is created
+- `WarpDeleteEvent` - Fired when a waystone is deleted
+- `WarpUpdateEvent` - Fired when a waystone is modified
+
+Listen to these events in your plugins:
+
+```kotlin
+@EventHandler
+fun onWarpCreate(event: WarpCreateEvent) {
+    val warp = event.warp
+    // Handle warp creation
+}
+```
+
+## Troubleshooting
+
+### Bedrock Forms Not Appearing
+- Ensure GeyserMenu Companion plugin is installed and running
+- Check server logs for `[Bedrock]` messages
+- Verify GeyserMC/Floodgate are loaded before WaystoneWarps
+- Try restarting the server if forms timeout
+
+### Waystones Not Being Discovered
+- Ensure player has `waystonewarps.discover` permission
+- Check that the waystone base structure is intact
+- Right-click the lodestone (center block) to discover
+
+### Teleportation Costs Not Working
+- Install Vault and an economy provider (e.g., EssentialsX Economy)
+- Ensure economy plugin is loaded before WaystoneWarps
+- Check that players have sufficient balance/XP
+
+### Commands Not Working
+- Verify permissions are assigned correctly
+- Ensure plugin is fully loaded (check startup messages)
+- Try using full command path: `/waystonewarps:warpmenu`
+
+## Performance Considerations
+
+- **Particle Effects** - Uses player-specific particles to avoid performance impact
+- **Hologram System** - Dynamic holograms only update when necessary
+- **Database** - SQLite with optimized queries and connection pooling
+- **Keepalive** - 5-second tick for Bedrock connection is low-overhead
+- **Caching** - Player Bedrock status is cached to reduce repeated checks
+
+For servers with thousands of waystones, consider:
+- Setting reasonable teleport cooldowns
+- Limiting particle effect ranges
+- Using permission-based warp limits
+
+## Contributing
+
+Contributions are welcome! Please feel free to:
+- Report bugs via GitHub Issues
+- Suggest features and improvements
+- Submit pull requests with enhancements
+
+## Future Roadmap
+
+Potential features for future releases:
+- Waystone networks and categories
+- Cross-server waystone teleportation (with Bungeecord support)
+- Waystone claim system
+- Advanced permission system
+- Voice/sound notifications
+- Particle customization per waystone
+
 ## Building from Source
 
 ### Requirements
 
 - Java JDK 21 or newer
 - Git
+- Gradle (included via gradlew)
 
 ### Compiling
 
-```
+```bash
 git clone https://github.com/mizarc/waystone-warps.git
 cd waystone-warps/
 ./gradlew build
@@ -186,10 +357,50 @@ cd waystone-warps/
 
 The compiled .jar binary can be found in the `build/libs` folder.
 
+### Development Setup
+
+```bash
+# Clone repository
+git clone https://github.com/mizarc/waystone-warps.git
+cd waystone-warps/
+
+# Build with tests
+./gradlew build
+
+# Deploy to local server
+./gradlew deploy
+# (Set plugin.server.path in gradle.properties first)
+```
+
 ## Support
 
-If you encounter any bugs, crashes, or unexpected behaviour, please [open an issue](https://github.com/mizarc/waystone-warps/issues) in this repository.
+If you encounter any bugs, crashes, or unexpected behaviour, please:
+
+1. **Check the logs** - Look for error messages with `[WaystoneWarps]` prefix
+2. **Update to latest version** - Your issue may already be fixed
+3. **Open an issue** - Provide logs, server version, plugin version, and steps to reproduce
+4. **Join the community** - Discuss on Spigot forums or Discord servers
+
+**GitHub Issues:** [https://github.com/mizarc/waystone-warps/issues](https://github.com/mizarc/waystone-warps/issues)
+
+## Credits
+
+Developed and maintained by the Waystone Warps team.
+
+Special thanks to:
+- **Geyser Project** - Cross-platform Minecraft compatibility
+- **Paper/Spigot Community** - Excellent server APIs
+- **GeyserMenu Contributors** - Native Bedrock menu integration
+- **Community Testers** - Bug reports and feature feedback
 
 ## License
 
-Waystone Warps is licensed under the permissive MIT license. Please view [LICENSE](LICENSE) for more info.
+Waystone Warps is licensed under the GNU General Public License v3 (GPL-3.0). 
+
+This means:
+- ✅ You can use, modify, and distribute this plugin
+- ✅ Any derivative works must also be licensed under GPL-3.0
+- ✅ Source code must be made available when distributed
+- ✅ No warranty is provided
+
+Please view [LICENSE](LICENSE) for the full license text and terms.
