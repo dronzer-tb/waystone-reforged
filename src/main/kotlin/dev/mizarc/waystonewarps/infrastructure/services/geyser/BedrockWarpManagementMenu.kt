@@ -65,8 +65,8 @@ class BedrockWarpManagementMenu(
             buttons.add(FormButton("§l§8Home §8(Off)", imagePath = "textures/items/bed_white"))
         }
 
-        // 5: Move
-        buttons.add(FormButton("§l§8Move", imagePath = "textures/blocks/piston_side"))
+        // 5: Delete
+        buttons.add(FormButton("§l§cDelete", imagePath = "textures/blocks/barrier"))
 
         // 6: Protection
         if (warp.isProtected) {
@@ -89,7 +89,7 @@ class BedrockWarpManagementMenu(
                     2 -> openRenameForm()
                     3 -> openSkinsMenu()
                     4 -> handleToggleHome()
-                    5 -> handleMove()
+                    5 -> handleDelete()
                     6 -> handleToggleProtection()
                     7 -> { /* back / close */ }
                 }
@@ -386,17 +386,17 @@ class BedrockWarpManagementMenu(
         }
     }
 
-    // --- Move ---
+    // --- Delete ---
 
-    private fun handleMove() {
+    private fun handleDelete() {
         BedrockSupport.sendModalForm(player,
-            title = "§l§8Move Waystone",
-            content = "Move this waystone to your current location?",
-            button1 = "§aYes, Move",
-            button2 = "§cCancel",
+            title = "§l§cDelete Waystone",
+            content = "Delete this waystone permanently?\n\n§c§lThis cannot be undone!",
+            button1 = "§cYes, Delete",
+            button2 = "§8Cancel",
             onButton1 = {
-                player.performCommand("waystonewarps move ${warp.id}")
-                player.sendMessage("§aWaystone moved to your current location.")
+                player.performCommand("waystonewarps break ${warp.id}")
+                player.sendMessage("§a${warp.name} has been deleted.")
             },
             onButton2 = { open() }
         )
