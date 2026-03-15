@@ -6,6 +6,7 @@ import dev.mizarc.waystonewarps.application.actions.management.*
 import dev.mizarc.waystonewarps.application.actions.whitelist.GetWhitelistedPlayers
 import dev.mizarc.waystonewarps.application.actions.whitelist.ToggleWhitelist
 import dev.mizarc.waystonewarps.application.results.UpdateWarpNameResult
+import dev.mizarc.waystonewarps.application.results.UpdateWarpSkinResult
 import dev.mizarc.waystonewarps.application.services.ConfigService
 import dev.mizarc.waystonewarps.application.services.PlayerAttributeService
 import dev.mizarc.waystonewarps.domain.warps.Warp
@@ -35,6 +36,8 @@ class BedrockWarpManagementMenu(
     private val revokeDiscovery: RevokeDiscovery by inject()
     private val configService: ConfigService by inject()
     private val playerAttributeService: PlayerAttributeService by inject()
+    private val getAllWarpSkins: GetAllWarpSkins by inject()
+    private val updateWarpSkin: UpdateWarpSkin by inject()
 
     fun open() {
         val buttons = mutableListOf<FormButton>()
@@ -84,7 +87,7 @@ class BedrockWarpManagementMenu(
                     0 -> handleTogglePrivacy()
                     1 -> openDiscoveredPlayersMenu()
                     2 -> openRenameForm()
-                    3 -> player.sendMessage("§eSkins are only available on Java Edition.")
+                    3 -> openSkinsMenu()
                     4 -> handleToggleHome()
                     5 -> handleMove()
                     6 -> handleToggleProtection()
@@ -248,6 +251,97 @@ class BedrockWarpManagementMenu(
                 open()
             }
         )
+    }
+
+    // --- Skins ---
+
+    private val bedrockTextures = mapOf(
+        "SMOOTH_STONE" to "textures/blocks/stone_slab_top",
+        "STONE_BRICKS" to "textures/blocks/stonebrick",
+        "DEEPSLATE_TILES" to "textures/blocks/deepslate/deepslate_tiles",
+        "POLISHED_TUFF" to "textures/blocks/polished_tuff",
+        "TUFF_BRICKS" to "textures/blocks/tuff_bricks",
+        "RESIN_BRICKS" to "textures/blocks/resin_bricks",
+        "CUT_SANDSTONE" to "textures/blocks/sandstone_top",
+        "CUT_RED_SANDSTONE" to "textures/blocks/red_sandstone_top",
+        "NETHER_BRICKS" to "textures/blocks/nether_brick",
+        "POLISHED_BLACKSTONE" to "textures/blocks/polished_blackstone",
+        "QUARTZ_BLOCK" to "textures/blocks/quartz_block_side",
+        "WAXED_CUT_COPPER" to "textures/blocks/cut_copper",
+        "WAXED_EXPOSED_CUT_COPPER" to "textures/blocks/exposed_cut_copper",
+        "WAXED_WEATHERED_CUT_COPPER" to "textures/blocks/weathered_cut_copper",
+        "WAXED_OXIDIZED_CUT_COPPER" to "textures/blocks/oxidized_cut_copper"
+    )
+
+    private fun openSkinsMenu() {
+        val skins = getAllWarpSkins.execute()
+        val costTypeLabel = when (configService.getTeleportCostType()) {
+            CostType.MONEY -> "coins"
+            CostType.XP -> "XP"
+            CostType.ITEM -> configService.getTeleportCostItem().lowercase().replace("_", " ")
+        }
+
+        val buttons = skins.map { skinKey ->
+            val price = configService.getSkinPrice(skinKey)
+            val isActive = skinKey == warp.block
+            val skinName = skinKey.lowercase().replace("_", " ").replaceFirstChar { it.uppercase() }
+            val label = if (isActive) "§l§a$skinName §7(Active)" else "§l§8$skinName §e${price.toInt()}"
+            val texture = bedrockTextures[skinKey] ?: "textures/blocks/lodestone_top"
+            FormButton(label, imagePath = texture)
+        }.toMutableList()
+        buttons.add(FormButton("§l§8Back", imagePath = "textures/items/nether_star"))
+
+        BedrockSupport.sendSimpleForm(player,
+            title = "§l§8Waystone Skins",
+            content = "Select a skin to apply. Cost is paid in §e$costTypeLabel§r.",
+            buttons = buttons,
+            onButtonClicked = { index ->
+                if (index >= skins.size) {
+                    open()
+                    return@sendSimpleForm
+                }
+                val skinKey = skins[index]
+                val isActive = skinKey == warp.block
+                if (isActive) {
+                    player.sendMessage("§7This skin is already active.")
+                    openSkinsMenu()
+                    return@sendSimpleForm
+                }
+
+                val price = configService.getSkinPrice(skinKey)
+                val skinName = skinKey.lowercase().replace("_", " ").replaceFirstChar { it.uppercase() }
+
+                if (price <= 0) {
+                    applySkin(skinKey, skinName)
+                } else {
+                    BedrockSupport.sendModalForm(player,
+                        title = "§l§8Apply Skin",
+                        content = "Apply §e$skinName§r for §e${price.toInt()} $costTypeLabel§r?",
+                        button1 = "§aYes, Apply",
+                        button2 = "§cCancel",
+                        onButton1 = {
+                            if (!checkAndDeductCost(player, price)) {
+                                player.sendMessage("§cNot enough funds to purchase this skin!")
+                                openSkinsMenu()
+                                return@sendModalForm
+                            }
+                            applySkin(skinKey, skinName)
+                        },
+                        onButton2 = { openSkinsMenu() }
+                    )
+                }
+            }
+        )
+    }
+
+    private fun applySkin(skinKey: String, skinName: String) {
+        val result = updateWarpSkin.execute(warp.id, skinKey)
+        when (result) {
+            UpdateWarpSkinResult.SUCCESS -> player.sendMessage("§aSkin changed to $skinName!")
+            UpdateWarpSkinResult.BLOCK_NOT_VALID -> player.sendMessage("§cInvalid skin.")
+            else -> player.sendMessage("§cFailed to change skin.")
+        }
+        open()
     }
 
     // --- Home ---

@@ -34,7 +34,7 @@ class WarpItemListener(
         // Check if the item is a compass and the action is a right-click
         if (itemInHand.type == Material.COMPASS &&
                 (event.action == Action.RIGHT_CLICK_AIR || event.action == Action.RIGHT_CLICK_BLOCK)) {
-            if (BedrockSupport.isBedrockPlayer(player)) {
+            if (BedrockSupport.isAvailable() && BedrockSupport.isBedrockPlayer(player)) {
                 BedrockWarpMenu(player).open()
             } else {
                 val menuNavigator = MenuNavigator(player)

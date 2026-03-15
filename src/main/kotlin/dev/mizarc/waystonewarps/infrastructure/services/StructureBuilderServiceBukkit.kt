@@ -10,6 +10,7 @@ import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.Material
 import org.bukkit.World
+import org.bukkit.block.data.Levelled
 import org.bukkit.entity.BlockDisplay
 import org.bukkit.entity.Entity
 import org.bukkit.entity.EntityType
@@ -46,6 +47,7 @@ class StructureBuilderServiceBukkit(private val plugin: Plugin, private val conf
         val location = warp.position.toLocation(world)
         world.getBlockAt(location.blockX, location.blockY, location.blockZ).type = Material.LODESTONE
         world.getBlockAt(location.blockX, location.blockY - 1, location.blockZ).type = Material.valueOf(warp.block)
+        removeLight(world, location.blockX, location.blockY + 1, location.blockZ)
         removeBlockDisplay(warp, world)
     }
 
@@ -54,6 +56,7 @@ class StructureBuilderServiceBukkit(private val plugin: Plugin, private val conf
         val location = warp.position.toLocation(world)
         location.block.type = Material.AIR
         world.getBlockAt(location.blockX, location.blockY - 1, location.blockZ).type = Material.AIR
+        removeLight(world, location.blockX, location.blockY + 1, location.blockZ)
         removeBlockDisplay(warp, world)
     }
 
@@ -85,6 +88,9 @@ class StructureBuilderServiceBukkit(private val plugin: Plugin, private val conf
                 world.getBlockAt(location.blockX, location.blockY - 1, location.blockZ).type = structureBlocks[4]
             }
         }.runTaskLater(plugin, 2L)
+
+        // Place invisible light block above the waystone for passive lighting
+        placeLight(world, location.blockX, location.blockY + 1, location.blockZ)
 
         // Create and return entities
         return mutableListOf(
@@ -129,6 +135,24 @@ class StructureBuilderServiceBukkit(private val plugin: Plugin, private val conf
             if (customName is TextComponent && customName.content() == warp.id.toString()) {
                 entity.remove()
             }
+        }
+    }
+
+    private fun placeLight(world: World, x: Int, y: Int, z: Int) {
+        val block = world.getBlockAt(x, y, z)
+        if (block.type != Material.AIR && block.type != Material.LIGHT) return
+        block.type = Material.LIGHT
+        val data = block.blockData
+        if (data is Levelled) {
+            data.level = data.maximumLevel
+            block.setBlockData(data, false)
+        }
+    }
+
+    private fun removeLight(world: World, x: Int, y: Int, z: Int) {
+        val block = world.getBlockAt(x, y, z)
+        if (block.type == Material.LIGHT) {
+            block.type = Material.AIR
         }
     }
 }

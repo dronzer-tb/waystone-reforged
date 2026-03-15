@@ -113,7 +113,7 @@ class BedrockWarpMenu(
             buttons = listOf(
                 FormButton("§l§8Warp §7(${cost.toInt()} cost)", imagePath = "textures/items/ender_pearl"),
                 FormButton(favLabel, imagePath = favIcon),
-                FormButton("§l§cDelete Waystone", imagePath = "textures/items/barrier"),
+                FormButton("§l§cDelete Waystone", imagePath = "textures/blocks/barrier"),
                 FormButton("§l§cBack", imagePath = "textures/items/nether_star")
             ),
             onButtonClicked = { index ->

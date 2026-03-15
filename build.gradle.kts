@@ -76,6 +76,10 @@ tasks.test {
     useJUnitPlatform()
 }
 
+tasks.jar {
+    finalizedBy(tasks.shadowJar)
+}
+
 tasks.shadowJar {
     archiveClassifier = null
 }

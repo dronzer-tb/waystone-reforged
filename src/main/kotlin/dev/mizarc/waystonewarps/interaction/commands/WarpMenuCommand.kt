@@ -21,7 +21,7 @@ class WarpMenuCommand: BaseCommand(), KoinComponent {
 
     @Default
     fun onWarp(player: Player, @Optional backCommand: String? = null) {
-        if (BedrockSupport.isBedrockPlayer(player)) {
+        if (BedrockSupport.isAvailable() && BedrockSupport.isBedrockPlayer(player)) {
             BedrockWarpMenu(player).open()
         } else {
             val menuNavigator = MenuNavigator(player)

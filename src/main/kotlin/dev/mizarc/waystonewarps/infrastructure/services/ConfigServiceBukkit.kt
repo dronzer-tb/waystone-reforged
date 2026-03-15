@@ -42,7 +42,14 @@ class ConfigServiceBukkit(private val configFile: FileConfiguration): ConfigServ
 
     override fun getStructureBlocks(blockType: String): List<String> {
         if (blockType !in getAllSkinTypes()) return emptyList()
+        // Support new nested format (blocks key) with fallback to legacy flat list
+        val blocksList = configFile.getStringList("waystone_skins.$blockType.blocks")
+        if (blocksList.isNotEmpty()) return blocksList
         return configFile.getStringList("waystone_skins.$blockType")
+    }
+
+    override fun getSkinPrice(skinType: String): Double {
+        return configFile.getDouble("waystone_skins.$skinType.price", 0.0)
     }
 
     override fun allowWarpsMenuViaCompass(): Boolean {

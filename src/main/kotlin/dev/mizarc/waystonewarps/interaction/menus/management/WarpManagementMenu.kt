@@ -199,7 +199,7 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
             .name(localizationProvider.get(player.uniqueId, LocalizationKeys.MENU_WARP_MANAGEMENT_SKINS))
             .lore(localizationProvider.get(player.uniqueId, LocalizationKeys.MENU_WARP_MANAGEMENT_SKINS_LORE))
         val guiSkinViewItem = GuiItem(skinViewItem) {
-            menuNavigator.openMenu(WarpSkinsMenu(player, menuNavigator, localizationProvider))
+            menuNavigator.openMenu(WarpSkinsMenu(player, menuNavigator, warp, localizationProvider))
         }
         pane.addItem(guiSkinViewItem, 5, 0)
 

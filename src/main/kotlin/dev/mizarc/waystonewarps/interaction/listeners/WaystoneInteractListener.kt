@@ -59,7 +59,7 @@ class WaystoneInteractListener(
     private val recentDiscoveryEffects = mutableSetOf<Pair<UUID, UUID>>()
 
     private fun isBedrockPlayer(player: Player): Boolean {
-        return BedrockSupport.isBedrockPlayer(player)
+        return BedrockSupport.isAvailable() && BedrockSupport.isBedrockPlayer(player)
     }
 
     private fun openWarpMenuFor(player: Player, menuNavigator: MenuNavigator) {
@@ -165,13 +165,14 @@ class WaystoneInteractListener(
                         .append(Component.text(warp.name).color(AccentColourPalette.SUCCESS.color))
                         .append(Component.text( " has been discovered!").color(PrimaryColourPalette.SUCCESS.color)))
 
-                    // Play discovery effects only once per player-warp
+                    // Play discovery effects only once per player-warp.
+                    // Skip entirely for Bedrock players — Geyser translates particles
+                    // and sounds unreliably (TOTEM loops, HAPPY_VILLAGER loops, etc.).
                     val discoveryKey = Pair(player.uniqueId, it.id)
-                    if (!recentDiscoveryEffects.contains(discoveryKey)) {
+                    if (!BedrockSupport.isBedrockPlayer(player)
+                        && !recentDiscoveryEffects.contains(discoveryKey)) {
                         recentDiscoveryEffects.add(discoveryKey)
 
-                        // Use HAPPY_VILLAGER (safe on Bedrock) instead of TOTEM_OF_UNDYING
-                        // which triggers a full looping totem animation on Bedrock clients.
                         player.spawnParticle(Particle.HAPPY_VILLAGER, particleLocation, 30, 0.5, 0.5, 0.5)
                         player.playSound(particleLocation, Sound.BLOCK_AMETHYST_BLOCK_HIT, SoundCategory.BLOCKS, 1.0f, 1.0f)
 

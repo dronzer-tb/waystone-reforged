@@ -293,7 +293,6 @@ class WaystoneWarps: JavaPlugin() {
         server.pluginManager.registerEvents(ToolRemovalListener(), this)
         server.pluginManager.registerEvents(TeleportZoneProtectionListener(), this)
         server.pluginManager.registerEvents(WarpItemListener(configService), this)
-        server.pluginManager.registerEvents(WaystoneBaseInteractListener(), this)
     }
 
     private fun initialiseGeyserMenu() {

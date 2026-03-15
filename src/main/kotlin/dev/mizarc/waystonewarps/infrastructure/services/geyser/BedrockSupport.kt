@@ -190,22 +190,42 @@ object BedrockSupport : Listener {
     }
 
     /**
-     * Periodic keepalive — calls isConnected() every 60 seconds.
-     * This triggers internal activity on the GeyserMenu TCP connection,
-     * preventing idle timeout from firewalls/NAT.
-     * If disconnected, re-fetches the API singleton.
+     * Periodic keepalive — pings the GeyserMenu API every 5 seconds to keep the
+     * TCP connection active. This is more aggressive than the original 10-second
+     * check to prevent timeout on GeyserMenu's internal connection handlers.
+     *
+     * The keepalive actively calls isBedrockPlayer() which is a real API call that
+     * triggers network I/O, not just a status check. This prevents idle timeout
+     * from firewalls/NAT and from GeyserMenu's internal connection manager.
+     *
+     * If disconnected, re-fetches the API singleton with retries.
      */
     private fun startKeepalive() {
         keepaliveTask?.cancel()
-        // 1200 ticks = 60 seconds
+        // 100 ticks = 5 seconds (more aggressive keepalive to prevent GeyserMenu internal timeout)
         keepaliveTask = plugin.server.scheduler.runTaskTimer(plugin, Runnable {
             if (!geyserMenuAvailable || geyserMenuApi == null) return@Runnable
-            val connected = isApiConnected()
-            if (!connected) {
-                logger.warning("[Bedrock] Keepalive: API disconnected — attempting refresh")
-                refreshApi()
+            try {
+                // Perform an actual API call (not just status check) to keep connection active
+                // This triggers real network I/O which prevents TCP idle timeout
+                apiClass!!.getMethod("isBedrockPlayer", UUID::class.java)
+                    .invoke(geyserMenuApi, UUID.fromString("00000000-0000-0000-0000-000000000000"))
+            } catch (_: Exception) {
+                // Ignore errors from the ping call itself, just focus on connection state
+                if (!isApiConnected()) {
+                    logger.warning("[Bedrock] Keepalive: API disconnected — attempting refresh")
+                    if (!refreshApi()) {
+                        // Retry once more after a short delay
+                        plugin.server.scheduler.runTaskLater(plugin, Runnable {
+                            if (!isApiConnected()) {
+                                logger.warning("[Bedrock] Keepalive: second refresh attempt")
+                                refreshApi()
+                            }
+                        }, 40L) // 2 seconds later
+                    }
+                }
             }
-        }, 1200L, 1200L)
+        }, 100L, 100L)
     }
 
     // ================================================================
@@ -294,12 +314,30 @@ object BedrockSupport : Listener {
 
     /**
      * Ensures the API is connected before sending a form.
-     * Returns true if connected (possibly after refresh), false if unrecoverable.
+     * Makes a real API call (not just status check) to validate the connection is truly alive.
+     * Retries with refresh if the health check fails.
      */
     private fun ensureConnected(): Boolean {
-        if (isApiConnected()) return true
-        logger.warning("[Bedrock] API disconnected — refreshing before send")
-        return refreshApi()
+        // First, check raw connection status
+        if (!isApiConnected()) {
+            logger.warning("[Bedrock] API disconnected — refreshing before send")
+            if (!refreshApi()) {
+                logger.warning("[Bedrock] First refresh failed — retrying")
+                return refreshApi()
+            }
+            return true
+        }
+        
+        // Additionally, perform a health check with a real API call
+        // to detect stale connections that still report as "connected"
+        try {
+            apiClass!!.getMethod("isBedrockPlayer", UUID::class.java)
+                .invoke(geyserMenuApi, UUID.fromString("00000000-0000-0000-0000-000000000000"))
+            return true
+        } catch (e: Exception) {
+            logger.warning("[Bedrock] Health check failed: ${e.message} — refreshing API")
+            return refreshApi()
+        }
     }
 
     /**
@@ -314,7 +352,8 @@ object BedrockSupport : Listener {
         onClosed: () -> Unit = {}
     ): Boolean {
         if (!geyserMenuAvailable || createSimpleMenuMethod == null) {
-            logger.warning("[Bedrock] Cannot send simple form - GeyserMenu not available")
+            logger.warning("[Bedrock] Cannot send simple form '$title' - GeyserMenu not available")
+            player.sendMessage("§c[Waystone] Bedrock menu unavailable. Is GeyserMenu Companion running?")
             return false
         }
 

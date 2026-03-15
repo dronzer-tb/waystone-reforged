@@ -5,7 +5,9 @@ import dev.mizarc.waystonewarps.domain.discoveries.DiscoveryRepository
 import dev.mizarc.waystonewarps.domain.warps.Warp
 import dev.mizarc.waystonewarps.domain.whitelist.WhitelistRepository
 import dev.mizarc.waystonewarps.infrastructure.mappers.toLocation
+import dev.mizarc.waystonewarps.infrastructure.services.geyser.BedrockSupport
 import org.bukkit.Bukkit
+import org.bukkit.Color
 import org.bukkit.Particle
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
@@ -33,16 +35,32 @@ class StructureParticleServiceBukkit(private val plugin: JavaPlugin,
                     ) {
                         val discovered = playerDiscoveryRepository.getByWarpAndPlayer(warp.id, player.uniqueId)
                         val whitelisted = whitelistRepository.isWhitelisted(warp.id, player.uniqueId)
+                        val isBedrock = BedrockSupport.isBedrockPlayer(player)
 
                         if (warp.playerId == player.uniqueId) {
-                            player.spawnParticle(Particle.HAPPY_VILLAGER, location, 1, 0.5, 0.5, 0.5)
+                            if (isBedrock) {
+                                player.spawnParticle(Particle.DUST, location, 1, 0.5, 0.5, 0.5, 0.0,
+                                    Particle.DustOptions(Color.fromRGB(0, 200, 0), 1.0f))
+                            } else {
+                                player.spawnParticle(Particle.HAPPY_VILLAGER, location, 1, 0.5, 0.5, 0.5)
+                            }
                         } else if (warp.isLocked && !whitelisted) {
-                            player.spawnParticle(Particle.WAX_ON, location, 1, 0.5, 0.5, 0.5)
+                            if (isBedrock) {
+                                player.spawnParticle(Particle.DUST, location, 1, 0.5, 0.5, 0.5, 0.0,
+                                    Particle.DustOptions(Color.fromRGB(255, 80, 80), 1.0f))
+                            } else {
+                                player.spawnParticle(Particle.WAX_ON, location, 1, 0.5, 0.5, 0.5)
+                            }
                         } else {
-                            val particle = if (discovered != null) Particle.SCRAPE else Particle.WAX_OFF
-                            player.spawnParticle(particle, location, 1, 0.5, 0.5, 0.5)
+                            if (isBedrock) {
+                                val dustColor = if (discovered != null) Color.fromRGB(100, 200, 255) else Color.fromRGB(255, 200, 50)
+                                player.spawnParticle(Particle.DUST, location, 1, 0.5, 0.5, 0.5, 0.0,
+                                    Particle.DustOptions(dustColor, 1.0f))
+                            } else {
+                                val particle = if (discovered != null) Particle.SCRAPE else Particle.WAX_OFF
+                                player.spawnParticle(particle, location, 1, 0.5, 0.5, 0.5)
+                            }
                         }
-
                     }
                 }
             }

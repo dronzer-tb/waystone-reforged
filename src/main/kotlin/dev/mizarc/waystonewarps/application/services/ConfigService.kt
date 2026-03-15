@@ -12,6 +12,7 @@ interface ConfigService {
     fun getPlatformReplaceBlocks(): Set<String>
     fun getAllSkinTypes(): List<String>
     fun getStructureBlocks(blockType: String): List<String>
+    fun getSkinPrice(skinType: String): Double
     fun allowWarpsMenuViaCompass(): Boolean
     fun allowWarpsMenuViaWaystone(): Boolean
     fun hologramsEnabled(): Boolean

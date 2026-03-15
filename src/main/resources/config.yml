@@ -56,9 +56,9 @@ home_unset_cost_multiplier: 2
 # Example: If base cost is 4 and multiplier is 5, enabling protection costs 20.
 protection_mode_cost_multiplier: 5
 
-# The blocks that can be used to transform the waystone appearance. This
-# contains all the required blocks that make up the waystone that must be in the
-# following order:
+# The blocks that can be used to transform the waystone appearance. Each skin
+# has a price (flat cost using the teleport_cost_type) and the required blocks
+# in the following order:
 #
 #    ------    < 1 Upper Block
 #   --------
@@ -70,95 +70,125 @@ protection_mode_cost_multiplier: 5
 #   --------    < 5 Bottom Slab
 waystone_skins:
   SMOOTH_STONE:
-    - SMOOTH_STONE
-    - LODESTONE
-    - SMOOTH_STONE
-    - SMOOTH_STONE
-    - SMOOTH_STONE_SLAB
+    price: 0
+    blocks:
+      - SMOOTH_STONE
+      - LODESTONE
+      - SMOOTH_STONE
+      - SMOOTH_STONE
+      - SMOOTH_STONE_SLAB
   STONE_BRICKS:
-    - STONE_BRICKS
-    - CHISELED_STONE_BRICKS
-    - STONE_BRICKS
-    - STONE_BRICKS
-    - STONE_BRICK_SLAB
+    price: 5
+    blocks:
+      - STONE_BRICKS
+      - CHISELED_STONE_BRICKS
+      - STONE_BRICKS
+      - STONE_BRICKS
+      - STONE_BRICK_SLAB
   DEEPSLATE_TILES:
-    - DEEPSLATE_TILES
-    - CHISELED_DEEPSLATE
-    - DEEPSLATE_TILES
-    - DEEPSLATE_TILES
-    - DEEPSLATE_TILE_SLAB
+    price: 8
+    blocks:
+      - DEEPSLATE_TILES
+      - CHISELED_DEEPSLATE
+      - DEEPSLATE_TILES
+      - DEEPSLATE_TILES
+      - DEEPSLATE_TILE_SLAB
   POLISHED_TUFF:
-    - POLISHED_TUFF
-    - CHISELED_TUFF
-    - POLISHED_TUFF
-    - POLISHED_TUFF
-    - POLISHED_TUFF_SLAB
+    price: 8
+    blocks:
+      - POLISHED_TUFF
+      - CHISELED_TUFF
+      - POLISHED_TUFF
+      - POLISHED_TUFF
+      - POLISHED_TUFF_SLAB
   TUFF_BRICKS:
-    - TUFF_BRICKS
-    - CHISELED_TUFF_BRICKS
-    - TUFF_BRICKS
-    - TUFF_BRICKS
-    - TUFF_BRICK_SLAB
+    price: 8
+    blocks:
+      - TUFF_BRICKS
+      - CHISELED_TUFF_BRICKS
+      - TUFF_BRICKS
+      - TUFF_BRICKS
+      - TUFF_BRICK_SLAB
   RESIN_BRICKS:
-    - RESIN_BRICKS
-    - CHISELED_RESIN_BRICKS
-    - RESIN_BRICKS
-    - RESIN_BRICKS
-    - RESIN_BRICK_SLAB
+    price: 10
+    blocks:
+      - RESIN_BRICKS
+      - CHISELED_RESIN_BRICKS
+      - RESIN_BRICKS
+      - RESIN_BRICKS
+      - RESIN_BRICK_SLAB
   CUT_SANDSTONE:
-    - CUT_SANDSTONE
-    - CHISELED_SANDSTONE
-    - CUT_SANDSTONE
-    - CUT_SANDSTONE
-    - CUT_SANDSTONE_SLAB
+    price: 5
+    blocks:
+      - CUT_SANDSTONE
+      - CHISELED_SANDSTONE
+      - CUT_SANDSTONE
+      - CUT_SANDSTONE
+      - CUT_SANDSTONE_SLAB
   CUT_RED_SANDSTONE:
-    - CUT_RED_SANDSTONE
-    - CHISELED_RED_SANDSTONE
-    - CUT_RED_SANDSTONE
-    - CUT_RED_SANDSTONE
-    - CUT_RED_SANDSTONE_SLAB
+    price: 5
+    blocks:
+      - CUT_RED_SANDSTONE
+      - CHISELED_RED_SANDSTONE
+      - CUT_RED_SANDSTONE
+      - CUT_RED_SANDSTONE
+      - CUT_RED_SANDSTONE_SLAB
   NETHER_BRICKS:
-    - NETHER_BRICKS
-    - CHISELED_NETHER_BRICKS
-    - NETHER_BRICKS
-    - NETHER_BRICKS
-    - NETHER_BRICK_SLAB
+    price: 10
+    blocks:
+      - NETHER_BRICKS
+      - CHISELED_NETHER_BRICKS
+      - NETHER_BRICKS
+      - NETHER_BRICKS
+      - NETHER_BRICK_SLAB
   POLISHED_BLACKSTONE:
-    - POLISHED_BLACKSTONE
-    - CHISELED_POLISHED_BLACKSTONE
-    - POLISHED_BLACKSTONE
-    - POLISHED_BLACKSTONE
-    - POLISHED_BLACKSTONE_SLAB
+    price: 10
+    blocks:
+      - POLISHED_BLACKSTONE
+      - CHISELED_POLISHED_BLACKSTONE
+      - POLISHED_BLACKSTONE
+      - POLISHED_BLACKSTONE
+      - POLISHED_BLACKSTONE_SLAB
   QUARTZ_BLOCK:
-    - QUARTZ_BLOCK
-    - CHISELED_QUARTZ_BLOCK
-    - QUARTZ_BLOCK
-    - QUARTZ_BLOCK
-    - QUARTZ_SLAB
+    price: 10
+    blocks:
+      - QUARTZ_BLOCK
+      - CHISELED_QUARTZ_BLOCK
+      - QUARTZ_BLOCK
+      - QUARTZ_BLOCK
+      - QUARTZ_SLAB
   WAXED_CUT_COPPER:
-    - WAXED_CUT_COPPER
-    - WAXED_CHISELED_COPPER
-    - WAXED_CUT_COPPER
-    - WAXED_CUT_COPPER
-    - WAXED_CUT_COPPER_SLAB
+    price: 12
+    blocks:
+      - WAXED_CUT_COPPER
+      - WAXED_CHISELED_COPPER
+      - WAXED_CUT_COPPER
+      - WAXED_CUT_COPPER
+      - WAXED_CUT_COPPER_SLAB
   WAXED_EXPOSED_CUT_COPPER:
-    - WAXED_EXPOSED_CUT_COPPER
-    - WAXED_EXPOSED_CHISELED_COPPER
-    - WAXED_EXPOSED_CUT_COPPER
-    - WAXED_EXPOSED_CUT_COPPER
-    - WAXED_EXPOSED_CUT_COPPER_SLAB
+    price: 12
+    blocks:
+      - WAXED_EXPOSED_CUT_COPPER
+      - WAXED_EXPOSED_CHISELED_COPPER
+      - WAXED_EXPOSED_CUT_COPPER
+      - WAXED_EXPOSED_CUT_COPPER
+      - WAXED_EXPOSED_CUT_COPPER_SLAB
   WAXED_WEATHERED_CUT_COPPER:
-    - WAXED_WEATHERED_CUT_COPPER
-    - WAXED_WEATHERED_CHISELED_COPPER
-    - WAXED_WEATHERED_CUT_COPPER
-    - WAXED_WEATHERED_CUT_COPPER
-    - WAXED_WEATHERED_CUT_COPPER_SLAB
+    price: 12
+    blocks:
+      - WAXED_WEATHERED_CUT_COPPER
+      - WAXED_WEATHERED_CHISELED_COPPER
+      - WAXED_WEATHERED_CUT_COPPER
+      - WAXED_WEATHERED_CUT_COPPER
+      - WAXED_WEATHERED_CUT_COPPER_SLAB
   WAXED_OXIDIZED_CUT_COPPER:
-    - WAXED_OXIDIZED_CUT_COPPER
-    - WAXED_OXIDIZED_CHISELED_COPPER
-    - WAXED_OXIDIZED_CUT_COPPER
-    - WAXED_OXIDIZED_CUT_COPPER
-    - WAXED_OXIDIZED_CUT_COPPER_SLAB
+    price: 12
+    blocks:
+      - WAXED_OXIDIZED_CUT_COPPER
+      - WAXED_OXIDIZED_CHISELED_COPPER
+      - WAXED_OXIDIZED_CUT_COPPER
+      - WAXED_OXIDIZED_CUT_COPPER
+      - WAXED_OXIDIZED_CUT_COPPER_SLAB
 
 # Blocks that will be replaced with a solid platform when teleport to a waystone
 # occurs. It is recommended to add blocks that players are able to fall through

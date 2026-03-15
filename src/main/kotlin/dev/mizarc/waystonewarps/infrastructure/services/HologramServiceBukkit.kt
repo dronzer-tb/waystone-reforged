@@ -22,10 +22,16 @@ class HologramServiceBukkit(private val configService: ConfigService): HologramS
         val location = warp.position.toLocation(world)
 
         // Create the display component consisting of a name and coordinates
-        val nameColor = if (warp.isProtected) NamedTextColor.DARK_BLUE else NamedTextColor.GOLD
-        val nameComponent = Component.text(warp.name)
-            .color(nameColor)
-            .decorate(TextDecoration.BOLD)
+        val nameComponent = if (warp.isProtected) {
+            Component.text()
+                .append(Component.text("Protected : ", NamedTextColor.DARK_BLUE).decorate(TextDecoration.BOLD))
+                .append(Component.text(warp.name, NamedTextColor.GOLD).decorate(TextDecoration.BOLD))
+                .build()
+        } else {
+            Component.text(warp.name)
+                .color(NamedTextColor.GOLD)
+                .decorate(TextDecoration.BOLD)
+        }
         val coordinatesComponent = Component.text("X: ${warp.position.x}  Y: ${warp.position.y}  Z: ${warp.position.z}")
             .color(NamedTextColor.GRAY)
         val componentsToJoin = mutableListOf<Component>(nameComponent, coordinatesComponent)
