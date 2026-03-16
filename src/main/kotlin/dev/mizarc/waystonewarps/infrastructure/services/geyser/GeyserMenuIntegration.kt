@@ -8,6 +8,7 @@ import dev.mizarc.waystonewarps.interaction.messaging.PrimaryColourPalette
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.plugin.java.JavaPlugin
+import org.bukkit.scheduler.BukkitTask
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.lang.reflect.Method
@@ -24,6 +25,7 @@ class GeyserMenuIntegration(private val plugin: JavaPlugin) : KoinComponent {
     private var apiClass: Class<*>? = null
     private var isAvailable = false
     private var buttonsRegistered = false
+    private var apiWatchdogTask: BukkitTask? = null
 
     private val getHomeWarp: GetHomeWarp by inject()
     private val teleportPlayer: TeleportPlayer by inject()
@@ -46,6 +48,49 @@ class GeyserMenuIntegration(private val plugin: JavaPlugin) : KoinComponent {
         return obj.javaClass.getDeclaredMethod(name, *paramTypes).apply { isAccessible = true }
     }
 
+    private fun refreshApiBinding(logErrors: Boolean): Boolean {
+        return try {
+            val resolvedApiClass = Class.forName("com.geysermenu.companion.api.GeyserMenuAPI")
+            val freshApi = resolvedApiClass.getMethod("getInstance").invoke(null)
+            if (freshApi == null) {
+                isAvailable = false
+                if (logErrors) logger.info("[GeyserMenu] API returned null")
+                return false
+            }
+
+            val apiChanged = freshApi !== geyserMenuApi || resolvedApiClass != apiClass
+            apiClass = resolvedApiClass
+            geyserMenuApi = freshApi
+            isAvailable = true
+
+            if (apiChanged) {
+                buttonsRegistered = false
+                logger.info("[GeyserMenu] API binding refreshed")
+            }
+
+            true
+        } catch (e: ClassNotFoundException) {
+            isAvailable = false
+            if (logErrors) logger.info("[GeyserMenu] GeyserMenuCompanion not found")
+            false
+        } catch (e: Exception) {
+            isAvailable = false
+            if (logErrors) logger.warning("[GeyserMenu] Failed to refresh API binding: ${e.message}")
+            false
+        }
+    }
+
+    private fun startApiWatchdog() {
+        apiWatchdogTask?.cancel()
+        apiWatchdogTask = plugin.server.scheduler.runTaskTimer(plugin, Runnable {
+            val previousApi = geyserMenuApi
+            if (!refreshApiBinding(logErrors = false)) return@Runnable
+            if (geyserMenuApi !== previousApi || !buttonsRegistered) {
+                registerButtons()
+            }
+        }, 20L * 60, 20L * 60)
+    }
+
     fun initialize(): Boolean {
         val formsAvailable = BedrockSupport.initialize(plugin)
         if (!formsAvailable) {
@@ -53,35 +98,24 @@ class GeyserMenuIntegration(private val plugin: JavaPlugin) : KoinComponent {
             return false
         }
 
-        try {
-            apiClass = Class.forName("com.geysermenu.companion.api.GeyserMenuAPI")
-            val getInstanceMethod = apiClass!!.getMethod("getInstance")
-            geyserMenuApi = getInstanceMethod.invoke(null)
-
-            if (geyserMenuApi != null) {
-                isAvailable = true
-                logger.info("[GeyserMenu] API available - registering buttons with delay")
-
-                plugin.server.scheduler.runTaskLater(plugin, Runnable {
-                    registerButtons()
-                }, 40L)
-
-                return true
-            } else {
-                logger.info("[GeyserMenu] API returned null")
-            }
-        } catch (e: ClassNotFoundException) {
-            logger.info("[GeyserMenu] GeyserMenuCompanion not found")
-        } catch (e: Exception) {
-            logger.warning("[GeyserMenu] Failed to initialize: ${e.message}")
-            e.printStackTrace()
+        if (!refreshApiBinding(logErrors = true)) {
+            return false
         }
-        return false
+
+        logger.info("[GeyserMenu] API available - registering buttons with delay")
+
+        plugin.server.scheduler.runTaskLater(plugin, Runnable {
+            registerButtons()
+        }, 40L)
+        startApiWatchdog()
+
+        return true
     }
 
     private fun registerButtons() {
-        if (!isAvailable || geyserMenuApi == null || buttonsRegistered) return
-        registerButton(
+        if (!refreshApiBinding(logErrors = true) || buttonsRegistered) return
+
+        val warpRegistered = registerButton(
             id = WARP_BUTTON_ID,
             text = "§l§8Warp",
             imagePath = "textures/blocks/lodestone_top",
@@ -89,7 +123,7 @@ class GeyserMenuIntegration(private val plugin: JavaPlugin) : KoinComponent {
         ) { player ->
             BedrockWarpMenu(player).open()
         }
-        registerButton(
+        val homeRegistered = registerButton(
             id = HOME_BUTTON_ID,
             text = "§l§8Home",
             imagePath = "textures/items/bed_red",
@@ -113,12 +147,16 @@ class GeyserMenuIntegration(private val plugin: JavaPlugin) : KoinComponent {
                 onInterworldPermissionDenied = { player.sendMessage("§cNo cross-world teleport permission.") }
             )
         }
-        buttonsRegistered = true
-        logger.info("[GeyserMenu] Warp and Home buttons registered successfully")
+        buttonsRegistered = warpRegistered && homeRegistered
+        if (buttonsRegistered) {
+            logger.info("[GeyserMenu] Warp and Home buttons registered successfully")
+        } else {
+            logger.warning("[GeyserMenu] Button registration incomplete; will retry on watchdog")
+        }
     }
 
-    private fun registerButton(id: String, text: String, imagePath: String, priority: Int, onClick: (org.bukkit.entity.Player) -> Unit) {
-        try {
+    private fun registerButton(id: String, text: String, imagePath: String, priority: Int, onClick: (org.bukkit.entity.Player) -> Unit): Boolean {
+        return try {
             val menuButtonClass = Class.forName("com.geysermenu.companion.api.MenuButton")
             val builderMethod = menuButtonClass.getMethod("builder")
             val builder = builderMethod.invoke(null)
@@ -151,14 +189,24 @@ class GeyserMenuIntegration(private val plugin: JavaPlugin) : KoinComponent {
             val button = bt.getMethod("build").invoke(builder)
             apiClass!!.getMethod("registerButton", menuButtonClass).invoke(geyserMenuApi, button)
             logger.info("[GeyserMenu] Button '$id' registered")
+            true
         } catch (e: Exception) {
             logger.warning("[GeyserMenu] Failed to register button '$id': ${e.message}")
+            false
         }
     }
 
     fun shutdown() {
+        apiWatchdogTask?.cancel()
+        apiWatchdogTask = null
         BedrockSupport.shutdown()
-        if (!isAvailable || geyserMenuApi == null) return
+        if (!isAvailable || geyserMenuApi == null || apiClass == null) {
+            isAvailable = false
+            buttonsRegistered = false
+            geyserMenuApi = null
+            apiClass = null
+            return
+        }
 
         try {
             val unregisterMethod = apiClass!!.getMethod("unregisterButton", String::class.java)
@@ -168,6 +216,12 @@ class GeyserMenuIntegration(private val plugin: JavaPlugin) : KoinComponent {
                 buttonsRegistered = false
                 logger.info("[GeyserMenu] Buttons unregistered")
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        } finally {
+            isAvailable = false
+            buttonsRegistered = false
+            geyserMenuApi = null
+            apiClass = null
+        }
     }
 }
