@@ -61,7 +61,7 @@ dependencies {
     implementation("co.aikar:acf-paper:0.5.1-SNAPSHOT")
     compileOnly("com.zaxxer:HikariCP:7.0.2")
     // implementation("com.github.mizarc:IF:0.11.4-d")
-    implementation("com.github.stefvanschie.inventoryframework:IF:0.11.6")
+    implementation("com.github.stefvanschie.inventoryframework:IF:0.12.0")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7.1")
     compileOnly("me.xdrop:fuzzywuzzy:1.3.1")
 

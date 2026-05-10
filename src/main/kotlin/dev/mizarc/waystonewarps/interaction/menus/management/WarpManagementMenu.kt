@@ -3,6 +3,7 @@ package dev.mizarc.waystonewarps.interaction.menus.management
 import com.github.stefvanschie.inventoryframework.gui.GuiItem
 import com.github.stefvanschie.inventoryframework.gui.type.ChestGui
 import com.github.stefvanschie.inventoryframework.pane.StaticPane
+import com.github.stefvanschie.inventoryframework.pane.util.Slot
 import dev.mizarc.waystonewarps.application.actions.discovery.GetWarpPlayerAccess
 import dev.mizarc.waystonewarps.application.actions.management.ToggleHome
 import dev.mizarc.waystonewarps.application.actions.management.ToggleLock
@@ -46,8 +47,8 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
         val gui = ChestGui(1, title)
         gui.setOnTopClick { guiEvent -> guiEvent.isCancelled = true }
 
-        val pane = StaticPane(0, 0, 9, 1)
-        gui.addPane(pane)
+        val pane = StaticPane(9, 1)
+        gui.addPane(Slot.fromXY(0, 0), pane)
 
         // Slot 0: Access toggle (Public/Private)
         val canChangeAccess = PermissionHelper.canChangeAccessControl(player, warp.playerId)
@@ -115,11 +116,11 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
                 open()
             }
         }
-        pane.addItem(guiPrivacyItem, 0, 0)
+        pane.addItem(guiPrivacyItem, Slot.fromXY(0, 0))
 
         // Slot 1: Blank
         val blankItem1 = ItemStack(Material.GRAY_STAINED_GLASS_PANE).name(Component.text(" "))
-        pane.addItem(GuiItem(blankItem1) { /* no action */ }, 1, 0)
+        pane.addItem(GuiItem(blankItem1) { /* no action */ }, Slot.fromXY(1, 0))
 
         // Slot 2: Player management
         val canManageWhitelist = PermissionHelper.canManageWhitelist(player, warp.playerId)
@@ -139,7 +140,7 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
                 menuNavigator.openMenu(WarpPlayerMenu(player, menuNavigator, warp, localizationProvider))
             }
         }
-        pane.addItem(guiPlayerCountItem, 2, 0)
+        pane.addItem(guiPlayerCountItem, Slot.fromXY(2, 0))
 
         // Slot 3: Home toggle (free to set, costs to unset)
         val canSetHome = PermissionHelper.canModifyWaystone(player, warp.playerId, "waystonewarps.home")
@@ -173,7 +174,7 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
                 open()
             }
         }
-        pane.addItem(guiHomeItem, 3, 0)
+        pane.addItem(guiHomeItem, Slot.fromXY(3, 0))
 
         // Slot 4: Rename
         val canRename = PermissionHelper.canRename(player, warp.playerId)
@@ -192,7 +193,7 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
                 menuNavigator.openMenu(WarpRenamingMenu(player, menuNavigator, warp, localizationProvider))
             }
         }
-        pane.addItem(guiRenamingItem, 4, 0)
+        pane.addItem(guiRenamingItem, Slot.fromXY(4, 0))
 
         // Slot 5: Skins
         val skinViewItem = ItemStack(Material.valueOf(warp.block))
@@ -201,7 +202,7 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
         val guiSkinViewItem = GuiItem(skinViewItem) {
             menuNavigator.openMenu(WarpSkinsMenu(player, menuNavigator, warp, localizationProvider))
         }
-        pane.addItem(guiSkinViewItem, 5, 0)
+        pane.addItem(guiSkinViewItem, Slot.fromXY(5, 0))
 
         // Slot 6: Protection mode (costs to enable, free to disable)
         val canToggleProtection = PermissionHelper.canModifyWaystone(player, warp.playerId, "waystonewarps.bypass.protection")
@@ -234,11 +235,11 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
                 open()
             }
         }
-        pane.addItem(guiProtectionItem, 6, 0)
+        pane.addItem(guiProtectionItem, Slot.fromXY(6, 0))
 
         // Slot 7: Blank
         val blankItem2 = ItemStack(Material.GRAY_STAINED_GLASS_PANE).name(Component.text(" "))
-        pane.addItem(GuiItem(blankItem2) { /* no action */ }, 7, 0)
+        pane.addItem(GuiItem(blankItem2) { /* no action */ }, Slot.fromXY(7, 0))
 
         // Slot 8: Move
         val canRelocate = PermissionHelper.canRelocate(player, warp.playerId)
@@ -257,7 +258,7 @@ class WarpManagementMenu(private val player: Player, private val menuNavigator: 
                 givePlayerMoveTool(player)
             }
         }
-        pane.addItem(guiMoveItem, 8, 0)
+        pane.addItem(guiMoveItem, Slot.fromXY(8, 0))
 
         gui.show(player)
     }

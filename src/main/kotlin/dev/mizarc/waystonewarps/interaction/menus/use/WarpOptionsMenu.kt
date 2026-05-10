@@ -3,6 +3,7 @@ package dev.mizarc.waystonewarps.interaction.menus.use
 import com.github.stefvanschie.inventoryframework.gui.GuiItem
 import com.github.stefvanschie.inventoryframework.gui.type.HopperGui
 import com.github.stefvanschie.inventoryframework.pane.StaticPane
+import com.github.stefvanschie.inventoryframework.pane.util.Slot
 import dev.mizarc.waystonewarps.application.actions.discovery.IsPlayerFavouriteWarp
 import dev.mizarc.waystonewarps.application.actions.discovery.RevokeDiscovery
 import dev.mizarc.waystonewarps.application.actions.discovery.ToggleFavouriteDiscovery
@@ -42,11 +43,11 @@ class WarpOptionsMenu(
             LocalizationKeys.MENU_WARP_OPTIONS_TITLE, 
             warp.name
         ))
-        val pane = StaticPane(0, 0, 5, 1)
+        val pane = StaticPane(5, 1)
         gui.setOnTopClick { guiEvent -> guiEvent.isCancelled = true }
         gui.setOnBottomClick { guiEvent -> if (guiEvent.click == ClickType.SHIFT_LEFT ||
             guiEvent.click == ClickType.SHIFT_RIGHT) guiEvent.isCancelled = true }
-        gui.slotsComponent.addPane(pane)
+        gui.slotsComponent.addPane(Slot.fromXY(0, 0), pane)
 
         // Add back menu item
         val backItem = ItemStack(Material.NETHER_STAR).name(
@@ -55,7 +56,7 @@ class WarpOptionsMenu(
         val guiBackItem = GuiItem(backItem) { guiEvent ->
             menuNavigator.goBack()
         }
-        pane.addItem(guiBackItem, 0, 0)
+        pane.addItem(guiBackItem, Slot.fromXY(0, 0))
 
         // Add point menu item
         val guiPointItem: GuiItem
@@ -66,14 +67,14 @@ class WarpOptionsMenu(
             guiPointItem = GuiItem(pointItem) { guiEvent ->
                 givePlayerLodestoneCompass()
             }
-            pane.addItem(guiPointItem, 2, 0)
+            pane.addItem(guiPointItem, Slot.fromXY(2, 0))
         }
         else {
             val pointItem = ItemStack(Material.WIND_CHARGE)
                 .name(localizationProvider.get(player.uniqueId, LocalizationKeys.MENU_WARP_OPTIONS_ITEM_NO_COMPASS_NAME))
                 .lore(localizationProvider.get(player.uniqueId, LocalizationKeys.MENU_WARP_OPTIONS_ITEM_NO_COMPASS_LORE))
             guiPointItem = GuiItem(pointItem)
-            pane.addItem(guiPointItem, 2, 0)
+            pane.addItem(guiPointItem, Slot.fromXY(2, 0))
         }
 
         // Add favourite menu item
@@ -90,7 +91,7 @@ class WarpOptionsMenu(
             toggleFavouriteDiscovery.execute(player.uniqueId, warp.id)
             open()
         }
-        pane.addItem(guiFavouriteItem, 3, 0)
+        pane.addItem(guiFavouriteItem, Slot.fromXY(3, 0))
 
         // Add delete menu item
         val guiDeleteItem: GuiItem
@@ -115,7 +116,7 @@ class WarpOptionsMenu(
                 })
             }
         }
-        pane.addItem(guiDeleteItem, 4, 0)
+        pane.addItem(guiDeleteItem, Slot.fromXY(4, 0))
 
         gui.show(player)
     }
