@@ -1,9 +1,9 @@
 import java.util.Properties
 
 plugins {
-    kotlin("jvm") version "2.3.0"
-    id("com.gradleup.shadow") version "9.3.1"
-    kotlin("plugin.serialization") version "2.3.0"
+    kotlin("jvm") version "2.4.10"
+    id("com.gradleup.shadow") version "9.6.1"
+    kotlin("plugin.serialization") version "2.4.10"
 }
 
 val localProperties = Properties()
@@ -54,12 +54,12 @@ repositories {
 dependencies {
     testImplementation(kotlin("test"))
     compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-    compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
-    compileOnly("org.jetbrains.kotlin:kotlin-stdlib:2.3.0")
-    compileOnly("io.insert-koin:koin-core-jvm:4.1.1")
+    compileOnly("io.papermc.paper:paper-api:26.2.build.112-stable")
+    compileOnly("org.jetbrains.kotlin:kotlin-stdlib:2.4.10")
+    compileOnly("io.insert-koin:koin-core-jvm:4.2.2")
     implementation("co.aikar:idb-core:1.0.0-SNAPSHOT")
     implementation("co.aikar:acf-paper:0.5.1-SNAPSHOT")
-    compileOnly("com.zaxxer:HikariCP:7.0.2")
+    compileOnly("com.zaxxer:HikariCP:7.1.0")
     // implementation("com.github.mizarc:IF:0.11.4-d")
     implementation("com.github.stefvanschie.inventoryframework:IF:0.12.0")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7.1")
@@ -69,7 +69,18 @@ dependencies {
 }
 
 java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+    toolchain.languageVersion.set(JavaLanguageVersion.of(25))
+}
+
+kotlin {
+    jvmToolchain(25)
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_25)
+    }
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.release.set(25)
 }
 
 tasks.test {

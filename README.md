@@ -401,3 +401,41 @@ See [LICENSE](LICENSE) for full terms.
 *Waystone Reforged — A fork built for DronzerSMP and beyond.*
 
 </div>
+
+---
+
+## 🧵 Folia Support
+
+This build runs on [Folia](https://papermc.io/software/folia)'s regionised threading
+as well as regular Paper.
+
+- Teleports use `Entity#teleportAsync`. Platform building and area clearing happen at
+  the **destination**, which is usually a different region, so they run on the region
+  scheduler keyed to that location with the teleport chained out of them.
+- Structure and hologram block writes and entity spawns are dispatched onto the warp's
+  own region; the illegal `World#getEntities` scan was replaced with a bounded
+  `Location#getNearbyEntitiesByType`.
+- Waystone particles were inverted: instead of one task per warp reaching into every
+  online player (illegal on Folia), there is one task per player on their own scheduler.
+- InventoryFramework 0.12.0 calls `Bukkit.getScheduler()` on every cancelled click and
+  menu close, which throws on Folia. A Folia-safe listener replaces it at enable time.
+
+### Known limitation
+
+IF's static `Gui.GUI_INVENTORIES` is a `private static final WeakHashMap` that cannot be
+replaced without vendoring InventoryFramework. Anvil-backed menus (warp naming, renaming,
+warp/player search) still write to it from region threads. Two players in different
+regions opening one in the same instant can drop an entry — the menu stops responding and
+reopening fixes it. Low probability, but not zero.
+
+---
+
+## 🤖 AI Disclaimer
+
+Parts of this project were written with the assistance of AI (Anthropic's Claude) —
+specifically the Folia port and the triage of upstream changes, along with sections of this README.
+
+Every AI-authored change was compiled and statically verified against the target
+server API before release: the built jars were scanned to confirm no legacy Bukkit scheduler references remain in plugin code.
+That is **not** the same as being play-tested. Treat this as reviewed-but-unproven
+code, and please open an issue if you hit a bug.

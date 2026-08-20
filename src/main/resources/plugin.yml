@@ -2,6 +2,7 @@ name: WaystoneWarps
 version: 1.0.0
 api-version: '1.21'
 main: dev.mizarc.waystonewarps.WaystoneWarps
+folia-supported: true
 load: POSTWORLD
 softdepend:
   - Geyser-Spigot

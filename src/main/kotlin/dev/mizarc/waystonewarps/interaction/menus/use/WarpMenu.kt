@@ -22,6 +22,7 @@ import dev.mizarc.waystonewarps.interaction.models.toViewModel
 import dev.mizarc.waystonewarps.interaction.utils.applyIconMeta
 import org.bukkit.Material
 import org.bukkit.entity.Player
+import org.bukkit.event.inventory.ClickType
 import org.bukkit.inventory.ItemStack
 import dev.mizarc.waystonewarps.interaction.utils.lore
 import dev.mizarc.waystonewarps.interaction.utils.name
@@ -48,6 +49,8 @@ class WarpMenu(
     override fun open() {
         val gui = ChestGui(6, localizationProvider.get(player.uniqueId, LocalizationKeys.MENU_WARP_TITLE))
         gui.setOnTopClick { guiEvent -> guiEvent.isCancelled = true }
+        gui.setOnBottomClick { guiEvent -> if (guiEvent.click == ClickType.SHIFT_LEFT ||
+            guiEvent.click == ClickType.SHIFT_RIGHT) guiEvent.isCancelled = true }
 
         // Add controls pane
         addControlsSection(gui)
