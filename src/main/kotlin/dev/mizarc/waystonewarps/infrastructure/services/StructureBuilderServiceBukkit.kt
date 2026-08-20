@@ -40,7 +40,7 @@ class StructureBuilderServiceBukkit(private val plugin: Plugin, private val conf
         FoliaScheduler.atRegion(plugin, location) {
             // Idempotent: drop any stale displays first so a restart cannot stack duplicates.
             removeBlockDisplay(warp, location)
-            generateStructure(warp, getStructureBlocks(warp), world)
+            generateStructure(warp, getStructureBlocks(warp), world, location)
         }
     }
 
@@ -49,7 +49,7 @@ class StructureBuilderServiceBukkit(private val plugin: Plugin, private val conf
         val location = warp.position.toLocation(world)
         FoliaScheduler.atRegion(plugin, location) {
             // Generate and then remove the existing block displays after 2 ticks to prevent flashing.
-            val entityList = generateStructure(warp, getStructureBlocks(warp), world)
+            val entityList = generateStructure(warp, getStructureBlocks(warp), world, location)
             FoliaScheduler.atRegionLater(plugin, location, 2L) {
                 removeBlockDisplay(warp, location, entityList)
             }
@@ -109,9 +109,8 @@ class StructureBuilderServiceBukkit(private val plugin: Plugin, private val conf
         }
     }
 
-    private fun generateStructure(warp: Warp, structureBlocks: List<Material>, world: World): MutableList<Entity> {
-        val location = warp.position.toLocation(world)
-
+    private fun generateStructure(warp: Warp, structureBlocks: List<Material>, world: World,
+                                  location: Location): MutableList<Entity> {
         // Replace top block with main block type
         location.block.type = structureBlocks[1]
 
