@@ -6,6 +6,7 @@ import dev.mizarc.waystonewarps.application.actions.world.GetWarpAtPosition
 import dev.mizarc.waystonewarps.application.actions.world.IsValidWarpBase
 import dev.mizarc.waystonewarps.application.services.ConfigService
 import dev.mizarc.waystonewarps.infrastructure.mappers.toPosition3D
+import dev.mizarc.waystonewarps.infrastructure.scheduling.FoliaScheduler
 import dev.mizarc.waystonewarps.infrastructure.services.geyser.BedrockSupport
 import dev.mizarc.waystonewarps.infrastructure.services.geyser.BedrockWarpManagementMenu
 import dev.mizarc.waystonewarps.infrastructure.services.geyser.BedrockWarpMenu
@@ -39,6 +40,7 @@ import org.bukkit.inventory.ItemStack
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 class WaystoneInteractListener(
     private val configService: ConfigService
@@ -51,12 +53,13 @@ class WaystoneInteractListener(
 
     private val openOtherMenuPermission = "waystonewarps.bypass.open_menu"
 
-    // Debounce for Bedrock players to prevent repeated interactions
-    private val bedrockInteractCooldowns = mutableMapOf<UUID, Long>()
+    // Debounce for Bedrock players to prevent repeated interactions.
+    // Interactions arrive on per-region threads on Folia, so these have to be concurrent.
+    private val bedrockInteractCooldowns = ConcurrentHashMap<UUID, Long>()
     private val BEDROCK_COOLDOWN_MS = 3000L
 
     // Track recent discoveries to prevent duplicate effects
-    private val recentDiscoveryEffects = mutableSetOf<Pair<UUID, UUID>>()
+    private val recentDiscoveryEffects: MutableSet<Pair<UUID, UUID>> = ConcurrentHashMap.newKeySet()
 
     private fun isBedrockPlayer(player: Player): Boolean {
         return BedrockSupport.isAvailable() && BedrockSupport.isBedrockPlayer(player)
@@ -176,12 +179,14 @@ class WaystoneInteractListener(
                         player.spawnParticle(Particle.HAPPY_VILLAGER, particleLocation, 30, 0.5, 0.5, 0.5)
                         player.playSound(particleLocation, Sound.BLOCK_AMETHYST_BLOCK_HIT, SoundCategory.BLOCKS, 1.0f, 1.0f)
 
-                        // Clean up the guard entry after 10 seconds
-                        Bukkit.getScheduler().runTaskLater(
-                            Bukkit.getPluginManager().getPlugin("WaystoneWarps")!!,
-                            Runnable { recentDiscoveryEffects.remove(discoveryKey) },
-                            200L
-                        )
+                        // Clean up the guard entry after 10 seconds. The map is plugin-local state,
+                        // so this belongs on the global region scheduler rather than any one region.
+                        val owningPlugin = Bukkit.getPluginManager().getPlugin("WaystoneWarps")
+                        if (owningPlugin != null) {
+                            FoliaScheduler.globalLater(owningPlugin, 200L) {
+                                recentDiscoveryEffects.remove(discoveryKey)
+                            }
+                        }
                     }
                 } else {
                     // Already discovered - open warp menu if allowed

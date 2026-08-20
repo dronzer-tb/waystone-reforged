@@ -10,17 +10,20 @@ import dev.mizarc.waystonewarps.application.services.scheduling.Task
 import dev.mizarc.waystonewarps.domain.warps.Warp
 import dev.mizarc.waystonewarps.domain.whitelist.WhitelistRepository
 import dev.mizarc.waystonewarps.infrastructure.mappers.toLocation
+import dev.mizarc.waystonewarps.infrastructure.scheduling.FoliaScheduler
 import net.milkbowl.vault.economy.Economy
 import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.Material
 import org.bukkit.entity.Player
+import org.bukkit.plugin.Plugin
 import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
-class TeleportationServiceBukkit(private val playerAttributeService: PlayerAttributeService,
+class TeleportationServiceBukkit(private val plugin: Plugin,
+                                 private val playerAttributeService: PlayerAttributeService,
                                  private val configService: ConfigService,
                                  private val movementMonitorService: MovementMonitorService,
                                  private val whitelistRepository: WhitelistRepository,
@@ -67,12 +70,25 @@ class TeleportationServiceBukkit(private val playerAttributeService: PlayerAttri
         offsetLocation.yaw = player.yaw
         offsetLocation.add(0.0, -2.0, 0.0)
 
-        // Teleports the player instantaneously
+        // Cost and potion effect touch only the player, so they stay on the calling (player's) thread.
         deductCost(player, costMultiplier)
-        clearArea(warp.position.toLocation(world))
-        buildPlatform(warp.position.toLocation(world))
         player.addPotionEffect(PotionEffect(PotionEffectType.RESISTANCE, 200, 4, false, false))
-        player.teleport(offsetLocation)
+
+        // Folia: the destination usually belongs to a different region - and may be in another world
+        // entirely - than the player issuing the warp. Clearing the landing area and building the
+        // platform are block writes, so they must happen on the thread that owns the destination.
+        // The teleport itself is then issued from the player's own thread using the asynchronous
+        // variant, which is the only teleport that is allowed to cross a region boundary.
+        val platformLocation = warp.position.toLocation(world)
+        FoliaScheduler.atRegion(plugin, platformLocation) {
+            clearArea(platformLocation)
+            buildPlatform(platformLocation)
+
+            val target = Bukkit.getPlayer(playerId) ?: return@atRegion
+            FoliaScheduler.forEntity(plugin, target) {
+                target.teleportAsync(offsetLocation)
+            }
+        }
         return TeleportResult.SUCCESS
     }
 
@@ -128,8 +144,8 @@ class TeleportationServiceBukkit(private val playerAttributeService: PlayerAttri
             return
         }
 
-        // Schedule the new teleportation task
-        val taskHandle = scheduler.schedule(delaySeconds * 20L) {
+        // Schedule the new teleportation task on the thread owning this player.
+        val taskHandle = scheduler.scheduleForPlayer(playerId, delaySeconds * 20L) {
             movementMonitorService.stopMonitoringPlayer(playerId)
             activeTeleportations.remove(playerId)
             val teleportResult = teleportPlayer(playerId, warp)
@@ -232,7 +248,7 @@ class TeleportationServiceBukkit(private val playerAttributeService: PlayerAttri
     }
 
     private fun subtractMoney(player: Player, teleportCost: Double) {
-        economy?.withdrawPlayer(player, teleportCost.toDouble())
+        economy?.withdrawPlayer(player, teleportCost)
     }
 
     private fun hasEnoughXp(player: Player, teleportCost: Double): Boolean {

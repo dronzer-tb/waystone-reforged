@@ -8,7 +8,8 @@ import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.plugin.java.JavaPlugin
-import org.bukkit.scheduler.BukkitTask
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask
+import dev.mizarc.waystonewarps.infrastructure.scheduling.FoliaScheduler
 import java.lang.reflect.Method
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -57,7 +58,7 @@ object BedrockSupport : Listener {
     private val bedrockPlayerCache = ConcurrentHashMap<UUID, Boolean>()
 
     // Keepalive task to prevent TCP connection timeout
-    private var keepaliveTask: BukkitTask? = null
+    private var keepaliveTask: ScheduledTask? = null
     private var isConnectedMethod: Method? = null
     private var menuClientRequestPlayerListMethod: Method? = null
     private var menuClientInstance: Any? = null
@@ -292,8 +293,8 @@ object BedrockSupport : Listener {
      */
     private fun startKeepalive() {
         keepaliveTask?.cancel()
-        keepaliveTask = plugin.server.scheduler.runTaskTimer(plugin, Runnable {
-            if (!geyserMenuAvailable || geyserMenuApi == null) return@Runnable
+        keepaliveTask = FoliaScheduler.globalTimer(plugin, KEEPALIVE_INTERVAL_TICKS, KEEPALIVE_INTERVAL_TICKS) {
+            if (!geyserMenuAvailable || geyserMenuApi == null) return@globalTimer
 
             val probeHealthy = sendNetworkKeepaliveProbe() || sendPublicApiKeepaliveProbe()
 
@@ -301,16 +302,16 @@ object BedrockSupport : Listener {
                 val reason = if (!probeHealthy) "probe failed" else "API disconnected"
                 logger.warning("[Bedrock] Keepalive: $reason — attempting refresh")
                 if (!refreshApiWithRetries()) {
-                    plugin.server.scheduler.runTaskLater(plugin, Runnable {
+                    FoliaScheduler.globalLater(plugin, 40L) {
                         val delayedProbeHealthy = sendNetworkKeepaliveProbe() || sendPublicApiKeepaliveProbe()
                         if (!delayedProbeHealthy || !isApiConnected()) {
                             logger.warning("[Bedrock] Keepalive: delayed refresh attempt")
                             refreshApiWithRetries(1)
                         }
-                    }, 40L)
+                    }
                 }
             }
-        }, KEEPALIVE_INTERVAL_TICKS, KEEPALIVE_INTERVAL_TICKS)
+        }
     }
 
     // ================================================================
@@ -319,9 +320,9 @@ object BedrockSupport : Listener {
 
     @EventHandler(priority = EventPriority.LOWEST)
     fun onPlayerJoin(event: PlayerJoinEvent) {
-        plugin.server.scheduler.runTaskLater(plugin, Runnable {
+        FoliaScheduler.forEntityLater(plugin, event.player, 5L) {
             cachePlayerStatus(event.player)
-        }, 5L)
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -456,9 +457,9 @@ object BedrockSupport : Listener {
             title = title
         )
 
-        plugin.server.scheduler.runTaskLater(plugin, Runnable {
-            val current = pendingFormDispatches[player.uniqueId] ?: return@Runnable
-            if (current.dispatchId != dispatchId) return@Runnable
+        FoliaScheduler.forEntityLater(plugin, player, FORM_RESPONSE_TIMEOUT_TICKS) {
+            val current = pendingFormDispatches[player.uniqueId] ?: return@forEntityLater
+            if (current.dispatchId != dispatchId) return@forEntityLater
 
             pendingFormDispatches.remove(player.uniqueId, current)
             deliveryTimeoutPlayers[player.uniqueId] = System.currentTimeMillis()
@@ -466,7 +467,7 @@ object BedrockSupport : Listener {
                 "[Bedrock] ${current.formType} form '${current.title}' to ${player.name} timed out waiting for response " +
                     "(>${FORM_RESPONSE_TIMEOUT_TICKS / 20}s); delivery path may be stale"
             )
-        }, FORM_RESPONSE_TIMEOUT_TICKS)
+        }
 
         return dispatchId
     }
@@ -499,14 +500,14 @@ object BedrockSupport : Listener {
 
         if (!ensureConnected() || !recoverTimedOutDelivery(player, "Simple", title)) {
             // Schedule a retry after a short delay
-            plugin.server.scheduler.runTaskLater(plugin, Runnable {
+            FoliaScheduler.forEntityLater(plugin, player, RETRY_DELAY_TICKS) {
                 if (ensureConnected() && recoverTimedOutDelivery(player, "Simple", title)) {
                     doSendSimpleForm(player, title, content, buttons, onButtonClicked, onClosed)
                 } else {
                     logger.warning("[Bedrock] API still disconnected after retry — form '${title}' not sent")
                     player.sendMessage("§c[Waystone] Bedrock menu temporarily unavailable. Please try again.")
                 }
-            }, RETRY_DELAY_TICKS)
+            }
             return false
         }
 
@@ -548,11 +549,11 @@ object BedrockSupport : Listener {
 
             // Send with response handler
             val responseHandler = java.util.function.Consumer<Any> { response ->
-                plugin.server.scheduler.runTask(plugin, Runnable {
+                FoliaScheduler.forEntity(plugin, player) {
                     dispatchId?.let { finishFormDispatchTracking(player.uniqueId, it) }
                     try {
                         val wasClosed = findMethod(response, "wasClosed").invoke(response) as? Boolean ?: false
-                        if (wasClosed) { onClosed(); return@Runnable }
+                        if (wasClosed) { onClosed(); return@forEntity }
 
                         val buttonId = findMethod(response, "getButtonId").invoke(response) as? Int ?: -1
                         if (buttonId >= 0) onButtonClicked(buttonId)
@@ -560,7 +561,7 @@ object BedrockSupport : Listener {
                         logger.warning("[Bedrock] Simple form response error: ${e.message}")
                         e.printStackTrace()
                     }
-                })
+                }
             }
 
             bt.getMethod("send", java.util.function.Consumer::class.java)
@@ -595,14 +596,14 @@ object BedrockSupport : Listener {
         }
 
         if (!ensureConnected() || !recoverTimedOutDelivery(player, "Modal", title)) {
-            plugin.server.scheduler.runTaskLater(plugin, Runnable {
+            FoliaScheduler.forEntityLater(plugin, player, RETRY_DELAY_TICKS) {
                 if (ensureConnected() && recoverTimedOutDelivery(player, "Modal", title)) {
                     doSendModalForm(player, title, content, button1, button2, onButton1, onButton2, onClosed)
                 } else {
                     logger.warning("[Bedrock] API still disconnected after retry — modal '${title}' not sent")
                     player.sendMessage("§c[Waystone] Bedrock menu temporarily unavailable. Please try again.")
                 }
-            }, RETRY_DELAY_TICKS)
+            }
             return false
         }
 
@@ -633,7 +634,7 @@ object BedrockSupport : Listener {
             dispatchId = startFormDispatchTracking(player, "Modal", title)
 
             val responseHandler = java.util.function.Consumer<Any> { response ->
-                plugin.server.scheduler.runTask(plugin, Runnable {
+                FoliaScheduler.forEntity(plugin, player) {
                     dispatchId?.let { finishFormDispatchTracking(player.uniqueId, it) }
                     try {
                         val buttonId = findMethod(response, "getButtonId").invoke(response) as? Int ?: -1
@@ -646,7 +647,7 @@ object BedrockSupport : Listener {
                         logger.warning("[Bedrock] Modal form response error: ${e.message}")
                         e.printStackTrace()
                     }
-                })
+                }
             }
 
             bt.getMethod("send", java.util.function.Consumer::class.java)
@@ -678,14 +679,14 @@ object BedrockSupport : Listener {
         }
 
         if (!ensureConnected() || !recoverTimedOutDelivery(player, "Custom", title)) {
-            plugin.server.scheduler.runTaskLater(plugin, Runnable {
+            FoliaScheduler.forEntityLater(plugin, player, RETRY_DELAY_TICKS) {
                 if (ensureConnected() && recoverTimedOutDelivery(player, "Custom", title)) {
                     doSendCustomForm(player, title, elements, onSubmit, onClosed)
                 } else {
                     logger.warning("[Bedrock] API still disconnected after retry — custom form '${title}' not sent")
                     player.sendMessage("§c[Waystone] Bedrock menu temporarily unavailable. Please try again.")
                 }
-            }, RETRY_DELAY_TICKS)
+            }
             return false
         }
 
@@ -738,12 +739,12 @@ object BedrockSupport : Listener {
             dispatchId = startFormDispatchTracking(player, "Custom", title)
 
             val responseHandler = java.util.function.Consumer<Any> { response ->
-                plugin.server.scheduler.runTask(plugin, Runnable {
+                FoliaScheduler.forEntity(plugin, player) {
                     dispatchId?.let { finishFormDispatchTracking(player.uniqueId, it) }
                     try {
                         try {
                             val wasClosed = findMethod(response, "wasClosed").invoke(response) as? Boolean
-                            if (wasClosed == true) { onClosed(); return@Runnable }
+                            if (wasClosed == true) { onClosed(); return@forEntity }
                         } catch (_: Exception) {}
 
                         val result = mutableMapOf<String, String>()
@@ -762,7 +763,7 @@ object BedrockSupport : Listener {
                         logger.warning("[Bedrock] Custom form response error: ${e.message}")
                         e.printStackTrace()
                     }
-                })
+                }
             }
 
             bt.getMethod("send", java.util.function.Consumer::class.java)

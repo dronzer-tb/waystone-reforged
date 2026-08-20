@@ -18,10 +18,12 @@ import kotlin.concurrent.thread
 class Warp(val id: UUID, val playerId: UUID, val creationTime: Instant, var name: String, var worldId: UUID,
            var position: Position3D, var icon: String, var iconMeta: IconMeta, var block: String, var isLocked: Boolean,
            var isHome: Boolean = false, var isProtected: Boolean = false) {
-    var breakCount = 3
+    // Read and written from several region threads on a regionised server, plus the reset timer
+    // below, so these have to be safely published.
+    @Volatile var breakCount = 3
 
     private val defaultBreakCount = 3
-    private var breakPeriod = false
+    private val breakPeriod = java.util.concurrent.atomic.AtomicBoolean(false)
 
     /**
      * Compiles a new warp based on the minimum details required.
@@ -39,13 +41,17 @@ class Warp(val id: UUID, val playerId: UUID, val creationTime: Instant, var name
      * Resets the break count after a set period of time.
      */
     fun resetBreakCount() {
-        if (!breakPeriod) {
-            thread(start = true) {
-                breakPeriod = true
+        // compareAndSet guarantees only one reset timer can ever be in flight, even when two region
+        // threads damage the same waystone in the same tick.
+        if (!breakPeriod.compareAndSet(false, true)) return
+        thread(start = true, isDaemon = true, name = "waystonewarps-break-reset") {
+            try {
                 Thread.sleep(10000)
-                breakCount = defaultBreakCount
-                breakPeriod = false
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
             }
+            breakCount = defaultBreakCount
+            breakPeriod.set(false)
         }
     }
 

@@ -9,9 +9,11 @@ import dev.mizarc.waystonewarps.infrastructure.persistence.storage.Storage
 import kotlinx.serialization.json.Json
 import java.time.Instant
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 
 class WarpRepositorySQLite(private val storage: Storage<Database>): WarpRepository {
-    private val warps: MutableMap<UUID, Warp> = mutableMapOf()
+    // In-memory cache reachable from every region thread; must be concurrent on Folia.
+    private val warps: MutableMap<UUID, Warp> = ConcurrentHashMap()
 
     private val iconMetaJson = Json {
         ignoreUnknownKeys = true

@@ -8,12 +8,13 @@ import java.text.MessageFormat
 import java.util.Locale
 import java.util.Properties
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 class PropertiesLocalizationProvider(private val config: ConfigService,
 private val dataFolder: File,
 private val playerLocaleService: PlayerLocaleService
 ): LocalizationProvider {
-    private val languages: MutableMap<String, Properties> = mutableMapOf()
+    private val languages: MutableMap<String, Properties> = ConcurrentHashMap()
     private val baseDefaultLanguageCode = "en"
 
     init {

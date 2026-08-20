@@ -7,8 +7,9 @@ import dev.mizarc.waystonewarps.interaction.localization.LocalizationProvider
 import dev.mizarc.waystonewarps.interaction.messaging.PrimaryColourPalette
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask
+import dev.mizarc.waystonewarps.infrastructure.scheduling.FoliaScheduler
 import org.bukkit.plugin.java.JavaPlugin
-import org.bukkit.scheduler.BukkitTask
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.lang.reflect.Method
@@ -25,7 +26,7 @@ class GeyserMenuIntegration(private val plugin: JavaPlugin) : KoinComponent {
     private var apiClass: Class<*>? = null
     private var isAvailable = false
     private var buttonsRegistered = false
-    private var apiWatchdogTask: BukkitTask? = null
+    private var apiWatchdogTask: ScheduledTask? = null
 
     private val getHomeWarp: GetHomeWarp by inject()
     private val teleportPlayer: TeleportPlayer by inject()
@@ -82,13 +83,14 @@ class GeyserMenuIntegration(private val plugin: JavaPlugin) : KoinComponent {
 
     private fun startApiWatchdog() {
         apiWatchdogTask?.cancel()
-        apiWatchdogTask = plugin.server.scheduler.runTaskTimer(plugin, Runnable {
+        // Plugin-local bookkeeping against a third party API: global region scheduler, not a region.
+        apiWatchdogTask = FoliaScheduler.globalTimer(plugin, 20L * 60, 20L * 60) {
             val previousApi = geyserMenuApi
-            if (!refreshApiBinding(logErrors = false)) return@Runnable
+            if (!refreshApiBinding(logErrors = false)) return@globalTimer
             if (geyserMenuApi !== previousApi || !buttonsRegistered) {
                 registerButtons()
             }
-        }, 20L * 60, 20L * 60)
+        }
     }
 
     fun initialize(): Boolean {
@@ -104,9 +106,9 @@ class GeyserMenuIntegration(private val plugin: JavaPlugin) : KoinComponent {
 
         logger.info("[GeyserMenu] API available - registering buttons with delay")
 
-        plugin.server.scheduler.runTaskLater(plugin, Runnable {
+        FoliaScheduler.globalLater(plugin, 40L) {
             registerButtons()
-        }, 40L)
+        }
         startApiWatchdog()
 
         return true
@@ -172,14 +174,16 @@ class GeyserMenuIntegration(private val plugin: JavaPlugin) : KoinComponent {
             val clickHandler = java.util.function.BiConsumer<Any, Any?> { bedrockPlayer, _ ->
                 try {
                     val uuid = findMethod(bedrockPlayer, "getUuid").invoke(bedrockPlayer) as UUID
-                    Bukkit.getScheduler().runTask(pluginRef, Runnable {
-                        val bukkitPlayer = Bukkit.getPlayer(uuid)
-                        if (bukkitPlayer != null) {
+                    // Invoked from a GeyserMenu network thread. Hop onto the thread that owns this
+                    // player before touching anything player-related.
+                    val bukkitPlayer = Bukkit.getPlayer(uuid)
+                    if (bukkitPlayer != null) {
+                        FoliaScheduler.forEntity(pluginRef, bukkitPlayer) {
                             onClick(bukkitPlayer)
-                        } else {
-                            loggerRef.warning("[GeyserMenu] Could not find Bukkit player for UUID: $uuid")
                         }
-                    })
+                    } else {
+                        loggerRef.warning("[GeyserMenu] Could not find Bukkit player for UUID: $uuid")
+                    }
                 } catch (e: Exception) {
                     loggerRef.warning("[GeyserMenu] Error handling button click: ${e.message}")
                 }

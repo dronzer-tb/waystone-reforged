@@ -7,9 +7,12 @@ import dev.mizarc.waystonewarps.infrastructure.persistence.storage.Storage
 import java.sql.SQLException
 import java.time.Instant
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 
 class DiscoveryRepositorySQLite(private val storage: Storage<Database>): DiscoveryRepository {
-    private val discoveries: MutableMap<UUID, MutableSet<Discovery>> = mutableMapOf()
+    // Cache reachable from every region thread; both the outer map and the per-player sets are
+    // mutated concurrently on Folia, so both have to be concurrent structures.
+    private val discoveries: MutableMap<UUID, MutableSet<Discovery>> = ConcurrentHashMap()
 
     init {
         preload()
@@ -37,7 +40,7 @@ class DiscoveryRepositorySQLite(private val storage: Storage<Database>): Discove
     }
 
     override fun add(discovery: Discovery) {
-        val playerDiscoveries = discoveries.getOrPut(discovery.playerId) { mutableSetOf() }
+        val playerDiscoveries = discoveries.getOrPut(discovery.playerId) { ConcurrentHashMap.newKeySet() }
         playerDiscoveries.add(discovery)
 
         try {
@@ -107,7 +110,7 @@ class DiscoveryRepositorySQLite(private val storage: Storage<Database>): Discove
             val isFavourite = result.getInt("isFavourite") != 0
             try {
                 val discovery = Discovery(warpId, playerId, discoveredTime, lastVisitedTime, isFavourite)
-                val foundDiscoveries = discoveries.getOrPut(playerId) { mutableSetOf(discovery) }
+                val foundDiscoveries = discoveries.getOrPut(playerId) { ConcurrentHashMap.newKeySet() }
                 foundDiscoveries.add(discovery)
             }
             catch (error: IllegalArgumentException) {

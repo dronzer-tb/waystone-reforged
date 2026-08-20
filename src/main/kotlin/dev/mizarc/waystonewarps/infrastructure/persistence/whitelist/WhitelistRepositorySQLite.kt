@@ -6,9 +6,11 @@ import dev.mizarc.waystonewarps.domain.whitelist.WhitelistRepository
 import dev.mizarc.waystonewarps.infrastructure.persistence.storage.Storage
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 class WhitelistRepositorySQLite(private val storage: Storage<Database>): WhitelistRepository {
-    private val whitelistMap = HashMap<UUID, MutableSet<UUID>>()
+    // Cache reachable from every region thread; both levels must be concurrent on Folia.
+    private val whitelistMap = ConcurrentHashMap<UUID, MutableSet<UUID>>()
 
     init {
         preload()
@@ -31,7 +33,7 @@ class WhitelistRepositorySQLite(private val storage: Storage<Database>): Whiteli
     }
 
     override fun add(whitelist: Whitelist) {
-        whitelistMap.computeIfAbsent(whitelist.warpId) { HashSet() }.add(whitelist.playerId)
+        whitelistMap.computeIfAbsent(whitelist.warpId) { ConcurrentHashMap.newKeySet() }.add(whitelist.playerId)
         storage.connection.executeInsert("INSERT INTO whitelist (warpId, playerId, creationTime) " +
                 "VALUES (?, ?, ?);",
             whitelist.warpId, whitelist.playerId, Instant.now())
@@ -55,7 +57,7 @@ class WhitelistRepositorySQLite(private val storage: Storage<Database>): Whiteli
         for (result in results) {
             val warpId = UUID.fromString(result.getString("warpId"))
             val playerId = UUID.fromString(result.getString("playerId"))
-            whitelistMap.computeIfAbsent(warpId) { HashSet() }.add(playerId)
+            whitelistMap.computeIfAbsent(warpId) { ConcurrentHashMap.newKeySet() }.add(playerId)
         }
     }
 }

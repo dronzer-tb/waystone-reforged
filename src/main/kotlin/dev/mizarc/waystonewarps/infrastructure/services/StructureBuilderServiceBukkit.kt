@@ -4,6 +4,7 @@ import dev.mizarc.waystonewarps.application.services.ConfigService
 import dev.mizarc.waystonewarps.application.services.StructureBuilderService
 import dev.mizarc.waystonewarps.domain.warps.Warp
 import dev.mizarc.waystonewarps.infrastructure.mappers.toLocation
+import dev.mizarc.waystonewarps.infrastructure.scheduling.FoliaScheduler
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.TextComponent
 import org.bukkit.Bukkit
@@ -15,49 +16,81 @@ import org.bukkit.entity.BlockDisplay
 import org.bukkit.entity.Entity
 import org.bukkit.entity.EntityType
 import org.bukkit.plugin.Plugin
-import org.bukkit.scheduler.BukkitRunnable
 import org.bukkit.util.Transformation
 import org.joml.AxisAngle4f
 import org.joml.Vector3f
 import java.util.*
 
+/**
+ * Builds the physical waystone structure and its block displays.
+ *
+ * Folia note: every method here writes blocks and spawns/removes entities at the warp's location.
+ * That location frequently belongs to a different region than the caller (an admin editing a remote
+ * warp, the plugin restoring every warp on enable, a warp being moved), so all world access is
+ * dispatched onto the region that owns the warp before it runs.
+ */
 class StructureBuilderServiceBukkit(private val plugin: Plugin, private val configService: ConfigService): StructureBuilderService {
+
+    /** Displays sit within a block or two of the warp; this bounds the region-local entity search. */
+    private val displaySearchRadius = 4.0
 
     override fun spawnStructure(warp: Warp) {
         val world = Bukkit.getWorld(warp.worldId) ?: return
-        val structureBlocks = getStructureBlocks(warp)
-        generateStructure(warp, structureBlocks, world)
+        val location = warp.position.toLocation(world)
+        FoliaScheduler.atRegion(plugin, location) {
+            // Idempotent: drop any stale displays first so a restart cannot stack duplicates.
+            removeBlockDisplay(warp, location)
+            generateStructure(warp, getStructureBlocks(warp), world)
+        }
     }
 
     override fun updateStructure(warp: Warp) {
         val world = Bukkit.getWorld(warp.worldId) ?: return
-        val structureBlocks = getStructureBlocks(warp)
-
-        // Generate and then remove existing block display after 2 ticks to prevent flashing
-        val entityList = generateStructure(warp, structureBlocks, world)
-        object : BukkitRunnable() {
-            override fun run() {
-                removeBlockDisplay(warp, world, entityList)
+        val location = warp.position.toLocation(world)
+        FoliaScheduler.atRegion(plugin, location) {
+            // Generate and then remove the existing block displays after 2 ticks to prevent flashing.
+            val entityList = generateStructure(warp, getStructureBlocks(warp), world)
+            FoliaScheduler.atRegionLater(plugin, location, 2L) {
+                removeBlockDisplay(warp, location, entityList)
             }
-        }.runTaskLater(plugin, 2L)
+        }
     }
 
     override fun revertStructure(warp: Warp) {
         val world = Bukkit.getWorld(warp.worldId) ?: return
         val location = warp.position.toLocation(world)
+        FoliaScheduler.atRegion(plugin, location) {
+            world.getBlockAt(location.blockX, location.blockY, location.blockZ).type = Material.LODESTONE
+            world.getBlockAt(location.blockX, location.blockY - 1, location.blockZ).type =
+                runCatching { Material.valueOf(warp.block) }.getOrDefault(Material.SMOOTH_STONE)
+            removeLight(world, location.blockX, location.blockY + 1, location.blockZ)
+            removeBlockDisplay(warp, location)
+        }
+    }
+
+    /**
+     * Reverts the structure immediately on the calling thread. Only safe to call when the caller
+     * already owns the warp's region, or during shutdown when the regions are no longer ticking.
+     */
+    fun revertStructureImmediately(warp: Warp) {
+        val world = Bukkit.getWorld(warp.worldId) ?: return
+        val location = warp.position.toLocation(world)
         world.getBlockAt(location.blockX, location.blockY, location.blockZ).type = Material.LODESTONE
-        world.getBlockAt(location.blockX, location.blockY - 1, location.blockZ).type = Material.valueOf(warp.block)
+        world.getBlockAt(location.blockX, location.blockY - 1, location.blockZ).type =
+            runCatching { Material.valueOf(warp.block) }.getOrDefault(Material.SMOOTH_STONE)
         removeLight(world, location.blockX, location.blockY + 1, location.blockZ)
-        removeBlockDisplay(warp, world)
+        removeBlockDisplay(warp, location)
     }
 
     override fun destroyStructure(warp: Warp) {
         val world = Bukkit.getWorld(warp.worldId) ?: return
         val location = warp.position.toLocation(world)
-        location.block.type = Material.AIR
-        world.getBlockAt(location.blockX, location.blockY - 1, location.blockZ).type = Material.AIR
-        removeLight(world, location.blockX, location.blockY + 1, location.blockZ)
-        removeBlockDisplay(warp, world)
+        FoliaScheduler.atRegion(plugin, location) {
+            location.block.type = Material.AIR
+            world.getBlockAt(location.blockX, location.blockY - 1, location.blockZ).type = Material.AIR
+            removeLight(world, location.blockX, location.blockY + 1, location.blockZ)
+            removeBlockDisplay(warp, location)
+        }
     }
 
     private fun getStructureBlocks(warp: Warp): List<Material> {
@@ -83,11 +116,9 @@ class StructureBuilderServiceBukkit(private val plugin: Plugin, private val conf
         location.block.type = structureBlocks[1]
 
         // Replace bottom block with slab (delay to avoid POI data mismatch error)
-        object : BukkitRunnable() {
-            override fun run() {
-                world.getBlockAt(location.blockX, location.blockY - 1, location.blockZ).type = structureBlocks[4]
-            }
-        }.runTaskLater(plugin, 2L)
+        FoliaScheduler.atRegionLater(plugin, location, 2L) {
+            world.getBlockAt(location.blockX, location.blockY - 1, location.blockZ).type = structureBlocks[4]
+        }
 
         // Place invisible light block above the waystone for passive lighting
         placeLight(world, location.blockX, location.blockY + 1, location.blockZ)
@@ -126,11 +157,21 @@ class StructureBuilderServiceBukkit(private val plugin: Plugin, private val conf
         return blockDisplay
     }
 
-    private fun removeBlockDisplay(warp: Warp, world: World, entityExclusions: List<Entity> = listOf()) {
-        val entities: MutableList<Entity> = world.entities
-        for (entity in entities) {
+    /**
+     * Removes this warp's block displays. Folia forbids iterating [World.getEntities] from a region
+     * thread, so this looks only at entities near the warp - which is where the displays live.
+     * Must be called from the thread owning [location].
+     */
+    private fun removeBlockDisplay(warp: Warp, location: Location, entityExclusions: List<Entity> = listOf()) {
+        val nearby = try {
+            location.getNearbyEntitiesByType(BlockDisplay::class.java, displaySearchRadius)
+        } catch (ex: Exception) {
+            plugin.logger.warning("Could not scan for waystone displays at ${warp.position}: ${ex.message}")
+            return
+        }
+
+        for (entity in nearby) {
             if (entityExclusions.contains(entity)) continue
-            if (entity !is BlockDisplay) continue
             val customName = entity.customName() ?: continue
             if (customName is TextComponent && customName.content() == warp.id.toString()) {
                 entity.remove()

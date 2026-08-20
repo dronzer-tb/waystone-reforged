@@ -54,6 +54,7 @@ import dev.mizarc.waystonewarps.infrastructure.persistence.storage.SQLiteStorage
 import dev.mizarc.waystonewarps.infrastructure.persistence.storage.Storage
 import dev.mizarc.waystonewarps.infrastructure.persistence.warps.WarpRepositorySQLite
 import dev.mizarc.waystonewarps.infrastructure.persistence.whitelist.WhitelistRepositorySQLite
+import dev.mizarc.waystonewarps.infrastructure.compat.FoliaGuiCompat
 import dev.mizarc.waystonewarps.infrastructure.services.*
 import dev.mizarc.waystonewarps.infrastructure.services.geyser.GeyserMenuIntegration
 import dev.mizarc.waystonewarps.infrastructure.services.teleportation.TeleportationServiceBukkit
@@ -146,7 +147,13 @@ class WaystoneWarps: JavaPlugin() {
         // Initialise GeyserMenu integration before events (optional soft dependency)
         initialiseGeyserMenu()
 
+        // Swap InventoryFramework's main-thread-only GUI listener for a Folia-safe one before any
+        // menu can be opened.
+        FoliaGuiCompat.install(this)
+
         registerEvents()
+
+        // Each display spawn dispatches itself onto the region that owns the warp.
         AddAllDisplays(warpRepository, structureBuilderService, hologramService).execute()
 
         // Initialise API
@@ -156,14 +163,50 @@ class WaystoneWarps: JavaPlugin() {
         for (warp in warpRepository.getAll()) {
             structureParticleService.spawnParticles(warp)
         }
+        (structureParticleService as? StructureParticleServiceBukkit)?.startForOnlinePlayers()
 
         logger.info("WaystoneWarps has been Enabled")
     }
 
     override fun onDisable() {
         geyserMenuIntegration?.shutdown()
-        RemoveAllDisplays(warpRepository, structureBuilderService, hologramService).execute()
+        (structureParticleService as? StructureParticleServiceBukkit)?.stopAll()
+        removeAllDisplaysOnShutdown()
         logger.info("WaystoneWarps has been Disabled")
+    }
+
+    /**
+     * Reverts every waystone structure during shutdown.
+     *
+     * On a regionised server there is no scheduler left to hand work to by the time onDisable runs -
+     * anything queued onto a region or the global scheduler at this point would simply never
+     * execute - so the world writes are performed inline and any failure is tolerated. This is safe
+     * to skip: [StructureBuilderServiceBukkit.spawnStructure] and
+     * [HologramServiceBukkit.spawnHologram] both clear stale displays for the warp before spawning,
+     * so a shutdown that fails to revert cannot leave duplicated displays behind on the next start.
+     */
+    private fun removeAllDisplaysOnShutdown() {
+        val builder = structureBuilderService as? StructureBuilderServiceBukkit
+        val holograms = hologramService as? HologramServiceBukkit
+        if (builder == null || holograms == null) {
+            RemoveAllDisplays(warpRepository, structureBuilderService, hologramService).execute()
+            return
+        }
+
+        var failures = 0
+        for (warp in warpRepository.getAll()) {
+            try {
+                builder.revertStructureImmediately(warp)
+                holograms.removeHologramImmediately(warp)
+            } catch (ex: Throwable) {
+                failures++
+            }
+        }
+
+        if (failures > 0) {
+            logger.warning("Could not revert $failures waystone structure(s) during shutdown; " +
+                    "they will be rebuilt cleanly on next start.")
+        }
     }
 
     private fun initialiseVaultDependency() {
@@ -204,11 +247,11 @@ class WaystoneWarps: JavaPlugin() {
         }
         structureBuilderService = StructureBuilderServiceBukkit(this, configService)
         scheduler = SchedulerServiceBukkit(this)
-        teleportationService = TeleportationServiceBukkit(playerAttributeService, configService,
+        teleportationService = TeleportationServiceBukkit(this, playerAttributeService, configService,
             movementMonitorService, whitelistRepository, scheduler, economy)
         structureParticleService = StructureParticleServiceBukkit(this, discoveryRepository, whitelistRepository)
         playerParticleService = PlayerParticleServiceBukkit(this, playerAttributeService)
-        hologramService = HologramServiceBukkit(configService)
+        hologramService = HologramServiceBukkit(this, configService)
         worldService = WorldServiceBukkit()
         warpEventPublisher = WarpEventPublisherBukkit()
         playerLocaleService = PlayerLocaleServicePaper()
@@ -293,6 +336,11 @@ class WaystoneWarps: JavaPlugin() {
         server.pluginManager.registerEvents(ToolRemovalListener(), this)
         server.pluginManager.registerEvents(TeleportZoneProtectionListener(), this)
         server.pluginManager.registerEvents(WarpItemListener(configService), this)
+
+        // Waystone particles are rendered per player on Folia, driven by join/quit.
+        (structureParticleService as? StructureParticleServiceBukkit)?.let {
+            server.pluginManager.registerEvents(it, this)
+        }
     }
 
     private fun initialiseGeyserMenu() {
